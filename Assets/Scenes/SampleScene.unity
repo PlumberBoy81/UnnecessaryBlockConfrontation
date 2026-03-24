@@ -321,9 +321,9 @@ MonoBehaviour:
   spikeHelmetSprite: {fileID: 0}
   bootSprite: {fileID: 0}
   upBoxingGloveSprite: {fileID: 2012531246}
-  leftBoxingGloveSprite: {fileID: 0}
-  rightBoxingGloveSprite: {fileID: 0}
-  shieldBubbleSprite: {fileID: 0}
+  leftBoxingGloveSprite: {fileID: 567076518}
+  rightBoxingGloveSprite: {fileID: 869259455}
+  shieldBubbleSprite: {fileID: 540137337}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -1464,9 +1464,9 @@ MonoBehaviour:
   spikeHelmetSprite: {fileID: 0}
   bootSprite: {fileID: 0}
   upBoxingGloveSprite: {fileID: 1009331830}
-  leftBoxingGloveSprite: {fileID: 0}
-  rightBoxingGloveSprite: {fileID: 0}
-  shieldBubbleSprite: {fileID: 0}
+  leftBoxingGloveSprite: {fileID: 1723666809}
+  rightBoxingGloveSprite: {fileID: 1532157334}
+  shieldBubbleSprite: {fileID: 1248143123}
 --- !u!1 &1009331830
 GameObject:
   m_ObjectHideFlags: 0
