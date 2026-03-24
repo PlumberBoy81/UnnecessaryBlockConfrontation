@@ -135,7 +135,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!212 &10916887
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -591,7 +591,7 @@ Rigidbody2D:
   m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.05
-  m_GravityScale: 0
+  m_GravityScale: 4
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -661,14 +661,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5790177e8be6f42f7b57059887438bdd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerNumber: 1
+  playerType: 1
+  currentState: 0
   boxingGloveSprite: {fileID: 869259455}
   hammerSprite: {fileID: 452571269}
   spikeHelmetSprite: {fileID: 46191316}
   bootSprite: {fileID: 10916886}
   upBoxingGloveSprite: {fileID: 2012531246}
-  leftBoxingGloveSprite: {fileID: 567076518}
-  rightBoxingGloveSprite: {fileID: 869259455}
   shieldBubble: {fileID: 540137337}
   stats:
     weight: 0
@@ -679,7 +678,7 @@ MonoBehaviour:
     airFriction: 0
     airSpeed: 0
     baseAirAccel: 0
-    additionalAirAccel: 0
+    addAirAccel: 0
     gravity: 0
     fallSpeed: 0
     fastFallSpeed: 0
@@ -687,7 +686,6 @@ MonoBehaviour:
     jumpHeight: 0
     shortHopHeight: 0
     doubleJumpHeight: 0
-  currentState: 5
 --- !u!1 &452571269
 GameObject:
   m_ObjectHideFlags: 0
@@ -2409,7 +2407,7 @@ Rigidbody2D:
   m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.05
-  m_GravityScale: 0
+  m_GravityScale: 4
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -2479,14 +2477,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5790177e8be6f42f7b57059887438bdd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerNumber: 0
+  playerType: 0
+  currentState: 5
   boxingGloveSprite: {fileID: 1532157334}
   hammerSprite: {fileID: 817249625}
   spikeHelmetSprite: {fileID: 2093908229}
   bootSprite: {fileID: 1400525844}
   upBoxingGloveSprite: {fileID: 1009331830}
-  leftBoxingGloveSprite: {fileID: 1723666809}
-  rightBoxingGloveSprite: {fileID: 1532157334}
   shieldBubble: {fileID: 1248143123}
   stats:
     weight: 0
@@ -2497,7 +2494,7 @@ MonoBehaviour:
     airFriction: 0
     airSpeed: 0
     baseAirAccel: 0
-    additionalAirAccel: 0
+    addAirAccel: 0
     gravity: 0
     fallSpeed: 0
     fastFallSpeed: 0
@@ -2505,7 +2502,6 @@ MonoBehaviour:
     jumpHeight: 0
     shortHopHeight: 0
     doubleJumpHeight: 0
-  currentState: 5
 --- !u!1 &1009331830
 GameObject:
   m_ObjectHideFlags: 0
@@ -2924,7 +2920,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!212 &1400525845
 SpriteRenderer:
   m_ObjectHideFlags: 0
