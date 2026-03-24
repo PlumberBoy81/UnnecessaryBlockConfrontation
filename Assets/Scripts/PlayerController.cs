@@ -1,631 +1,683 @@
 using UnityEngine;
+using System.Collections;
+
 
 [RequireComponent(typeof(Rigidbody2D))]
 [RequireComponent(typeof(BoxCollider2D))]
 public class PlayerController : MonoBehaviour
 {
-    public enum PlayerNumber { Player1_Red, Player2_Blue }
-    public enum PlayerState 
-    { 
-        Idle, Walk, InitialDash, Run, 
-        JumpSquat, InAir, Freefall, 
-        Shield, Roll, SpotDodge, AirDodge, 
-        Jab1, Jab2, Jab3, ForwardTilt, UpTilt, DownTilt, DashAttack, ForwardSmash, UpSmash, DownSmash, Hitstun 
-    }
-
+    public enum PlayerID { Player1_Red, Player2_Blue }
+   
     [Header("Player Settings")]
-    public PlayerNumber playerNumber;
-    
-    // Internal State
-    public PlayerState currentState = PlayerState.InAir;
-    public float currentDamage = 0f; // Smash % damage
-    public int facingDirection = 1; // 1 for right, -1 for left
-    
-    [Header("Visuals (Auto-generated if left empty)")]
-    public SpriteRenderer spriteRenderer;
-    public GameObject shieldBubble;
-    public GameObject boxingGloveSprite; // Used for Jab
-    public GameObject hammerSprite; // Used for F-Tilt
-    public GameObject spikeHelmetSprite; // Used for U-Tilt
-    public GameObject bootSprite; // Used for D-Tilt
-    public GameObject upBoxingGloveSprite; // Used for U-Smash
-    public GameObject backBoxingGloveSprite; // Used for D-Smash
+    public PlayerID playerID;
 
-    [Header("Fighter Stats")]
-    public FighterStats stats;
 
-    [System.Serializable]
-    public struct FighterStats
+    // --- CHARACTER STATS ---
+    [Header("Stats")]
+    public float weight;
+    public float initialDash;
+    public float runSpeed;
+    public float walkSpeed;
+    public float traction;
+    public float airFriction;
+    public float airSpeed;
+    public float baseAirAcceleration;
+    public float additionalAirAcceleration;
+    public float gravity;
+    public float fallSpeed;
+    public float fastFallSpeed;
+    public int jumpsquatFrames;
+    public float jumpHeight;
+    public float shortHopHeight;
+    public float doubleJumpHeight;
+
+
+    // --- INPUT KEYS ---
+    private KeyCode keyUp, keyDown, keyLeft, keyRight;
+    private KeyCode keyWalkModifier;
+    private KeyCode keyShieldDodge;
+    private KeyCode keyAttack;
+
+
+    // --- STATE MANAGEMENT ---
+    public enum FighterState
     {
-        public float weight;
-        public float initialDashSpeed;
-        public float runSpeed;
-        public float walkSpeed;
-        public float traction;
-        public float airFriction;
-        public float airSpeed;
-        public float baseAirAcceleration;
-        public float additionalAirAcceleration;
-        public float gravity;
-        public float fallSpeed;
-        public float fastFallSpeed;
-        public int jumpsquatFrames;
-        public float jumpHeight;
-        public float shortHopHeight;
-        public float doubleJumpHeight;
+        Idle, Walking, InitialDash, Running, Jumpsquat, Airborne,
+        Shielding, Rolling, SpotDodging, AirDodging, Attacking, Hitstun
     }
+    public FighterState currentState = FighterState.Idle;
 
-    // Physics & Component References
+
+    // --- HITBOX VISUALS & OBJECTS ---
+    [Header("Weapon GameObjects / Hitboxes")]
+    public GameObject boxingGloveSprite;
+    public GameObject hammerSprite;
+    public GameObject spikeHelmetSprite;
+    public GameObject bootSprite;
+    public GameObject upBoxingGloveSprite;
+    public GameObject leftBoxingGloveSprite; // For Down Smash
+    public GameObject rightBoxingGloveSprite; // For Down Smash
+    public GameObject shieldBubbleSprite;
+
+
+    // --- INTERNAL TRACKING ---
     private Rigidbody2D rb;
-    private BoxCollider2D boxCol;
-
-    // Trackers
+    private int frameCounter = 0;
     private int stateFrameTimer = 0;
-    private int attackWindowTimer = 0;
+   
+    // Jump tracking
     private bool isGrounded = false;
     private bool hasDoubleJump = true;
-    private bool hasAirDodged = false;
     private bool isFastFalling = false;
-    
-    // Inputs
-    private float inputX;
-    private float inputY;
-    private bool jumpPressed;
-    private bool jumpHeld;
-    private bool walkModHeld;
-    private bool shieldHeld;
-    private bool attackPressed;
+    private bool jumpButtonHeldDuringJumpsquat = false;
+
+
+    // Attack / Combo tracking
+    private int jabComboStep = 0;
+    private float lastAttackTime = 0f;
+    private float attackWindow = 0.4f; // Time allowed to press attack again for next jab
+
+
+    // Input Timers (for Smash vs Tilt detection)
+    private float leftPressedTime = -1f;
+    private float rightPressedTime = -1f;
+    private float upPressedTime = -1f;
+    private float downPressedTime = -1f;
+    private float smashTapWindow = 0.1f; // ~6 frames to tap and press attack for a smash
+
+
+    // Facing direction (1 for right, -1 for left)
+    private int facingDirection = 1;
+
 
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        boxCol = GetComponent<BoxCollider2D>();
-        
-        // Prevent Unity's physics from interfering with our custom Smash physics
+       
+        // Disable Unity's default gravity, this script simulates Smash gravity manually in FixedUpdate
         rb.gravityScale = 0f;
-        rb.freezeRotation = true;
-
-        SetupPlayer();
-        SetupVisuals();
+       
+        AssignStats();
+        AssignInputs();
+        DisableAllHitboxes();
     }
 
-    private void SetupPlayer()
+
+    void AssignStats()
     {
-        if (playerNumber == PlayerNumber.Player1_Red)
+        if (playerID == PlayerID.Player1_Red)
         {
-            gameObject.name = "Player 1 (Red)";
-            stats = new FighterStats {
-                weight = 98f, initialDashSpeed = 1.936f, runSpeed = 1.76f, walkSpeed = 1.155f,
-                traction = 0.102f, airFriction = 0.015f, airSpeed = 1.208f, baseAirAcceleration = 0.01f,
-                additionalAirAcceleration = 0.07f, gravity = 0.087f, fallSpeed = 1.5f, fastFallSpeed = 2.4f,
-                jumpsquatFrames = 3, jumpHeight = 2.51f, shortHopHeight = 1.75f, doubleJumpHeight = 2.51f
-            };
+            weight = 98f;
+            initialDash = 1.936f;
+            runSpeed = 1.76f;
+            walkSpeed = 1.155f;
+            traction = 0.102f;
+            airFriction = 0.015f;
+            airSpeed = 1.208f;
+            baseAirAcceleration = 0.01f;
+            additionalAirAcceleration = 0.07f;
+            gravity = 0.087f;
+            fallSpeed = 1.5f;
+            fastFallSpeed = 2.4f;
+            jumpsquatFrames = 3;
+            jumpHeight = 3.633f;
+            shortHopHeight = 1.754f;
+            doubleJumpHeight = 3.633f;
+        }
+        else if (playerID == PlayerID.Player2_Blue)
+        {
+            weight = 86f;
+            initialDash = 2.31f;
+            runSpeed = 3.85f;
+            walkSpeed = 1.444f;
+            traction = 0.138f;
+            airFriction = 0.01f;
+            airSpeed = 1.208f;
+            baseAirAcceleration = 0.01f;
+            additionalAirAcceleration = 0.04f;
+            gravity = 0.09f;
+            fallSpeed = 1.65f;
+            fastFallSpeed = 2.64f;
+            jumpsquatFrames = 3;
+            jumpHeight = 3.5f;
+            shortHopHeight = 1.689f;
+            doubleJumpHeight = 3.5f;
+        }
+    }
+
+
+    void AssignInputs()
+    {
+        if (playerID == PlayerID.Player1_Red)
+        {
+            keyUp = KeyCode.W;
+            keyDown = KeyCode.S;
+            keyLeft = KeyCode.A;
+            keyRight = KeyCode.D;
+            keyWalkModifier = KeyCode.LeftShift;
+            keyShieldDodge = KeyCode.E;
+            keyAttack = KeyCode.F;
         }
         else
         {
-            gameObject.name = "Player 2 (Blue)";
-            stats = new FighterStats {
-                weight = 86f, initialDashSpeed = 2.31f, runSpeed = 3.85f, walkSpeed = 1.444f,
-                traction = 0.138f, airFriction = 0.01f, airSpeed = 1.208f, baseAirAcceleration = 0.01f,
-                additionalAirAcceleration = 0.04f, gravity = 0.09f, fallSpeed = 1.65f, fastFallSpeed = 2.64f,
-                jumpsquatFrames = 3, jumpHeight = 2.51f, shortHopHeight = 1.74f, doubleJumpHeight = 2.51f
-            };
+            keyUp = KeyCode.UpArrow;
+            keyDown = KeyCode.DownArrow;
+            keyLeft = KeyCode.LeftArrow;
+            keyRight = KeyCode.RightArrow;
+            keyWalkModifier = KeyCode.RightShift;
+            keyShieldDodge = KeyCode.RightControl;
+            keyAttack = KeyCode.Space;
         }
     }
 
-    private void SetupVisuals()
-    {
-        // Auto-generate sprites if not assigned
-        if (spriteRenderer == null)
-        {
-            spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
-            Texture2D tex = new Texture2D(1, 1);
-            
-            Color playerColor = Color.white;
-            if (playerNumber == PlayerNumber.Player1_Red)
-                ColorUtility.TryParseHtmlString("#800000", out playerColor);
-            else
-                ColorUtility.TryParseHtmlString("#000080", out playerColor);
-                
-            tex.SetPixel(0, 0, playerColor);
-            tex.Apply();
-            spriteRenderer.sprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f));
-            transform.localScale = new Vector3(2, 2, 1);
-        }
-
-        if (shieldBubble == null)
-        {
-            shieldBubble = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            shieldBubble.transform.SetParent(transform);
-            shieldBubble.transform.localPosition = Vector3.zero;
-            shieldBubble.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
-            Destroy(shieldBubble.GetComponent<Collider>());
-            shieldBubble.GetComponent<Renderer>().material.color = new Color(1f, 0.5f, 1f, 0.4f); // Transparent pink
-            shieldBubble.SetActive(false);
-        }
-
-        if (boxingGloveSprite == null) CreateHitboxVisual(ref boxingGloveSprite, "Boxing Glove", Color.red, new Vector3(0.8f, 0.4f, 1f), new Vector3(1f, 0, 0));
-        if (hammerSprite == null) CreateHitboxVisual(ref hammerSprite, "Hammer", new Color(0.6f, 0.3f, 0f), new Vector3(1.5f, 0.5f, 1f), new Vector3(1.2f, 0, 0));
-        if (spikeHelmetSprite == null) CreateHitboxVisual(ref spikeHelmetSprite, "Spike Helmet", Color.gray, new Vector3(1.2f, 0.8f, 1f), new Vector3(0, 0.8f, 0)); // Positioned above
-        if (bootSprite == null) CreateHitboxVisual(ref bootSprite, "Boot", Color.black, new Vector3(1f, 0.4f, 1f), new Vector3(1f, -0.6f, 0)); // Positioned low
-        if (upBoxingGloveSprite == null) CreateHitboxVisual(ref upBoxingGloveSprite, "Up Boxing Glove", Color.red, new Vector3(1.2f, 2.4f, 1f), new Vector3(0, 1.5f, 0)); // Positioned high and large
-        if (backBoxingGloveSprite == null) CreateHitboxVisual(ref backBoxingGloveSprite, "Back Boxing Glove", Color.red, new Vector3(0.8f, 0.4f, 1f), new Vector3(-1f, 0, 0)); // Positioned behind
-    }
-
-    private void CreateHitboxVisual(ref GameObject obj, string name, Color color, Vector3 scale, Vector3 localPosition)
-    {
-        obj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        obj.name = name;
-        obj.transform.SetParent(transform);
-        obj.transform.localPosition = localPosition;
-        obj.transform.localScale = scale;
-        Destroy(obj.GetComponent<Collider>());
-        obj.GetComponent<Renderer>().material.color = color;
-        obj.SetActive(false);
-    }
 
     void Update()
     {
-        GatherInputs();
-        CheckGrounded();
-        FlipSprite();
+        // Track how recently direction keys were pressed for Smash Attack detection
+        if (Input.GetKeyDown(keyLeft)) leftPressedTime = Time.time;
+        if (Input.GetKeyDown(keyRight)) rightPressedTime = Time.time;
+        if (Input.GetKeyDown(keyUp)) upPressedTime = Time.time;
+        if (Input.GetKeyDown(keyDown)) downPressedTime = Time.time;
+
+
+        HandleInput();
     }
 
-    void FixedUpdate()
-    {
-        stateFrameTimer++;
-        ProcessState();
-    }
 
-    private void GatherInputs()
+    void HandleInput()
     {
-        if (playerNumber == PlayerNumber.Player1_Red)
+        if (currentState == FighterState.Hitstun || currentState == FighterState.Attacking ||
+            currentState == FighterState.Rolling || currentState == FighterState.SpotDodging ||
+            currentState == FighterState.AirDodging)
         {
-            inputX = (Input.GetKey(KeyCode.D) ? 1 : 0) - (Input.GetKey(KeyCode.A) ? 1 : 0);
-            inputY = (Input.GetKey(KeyCode.W) ? 1 : 0) - (Input.GetKey(KeyCode.S) ? 1 : 0);
-            jumpPressed = Input.GetKeyDown(KeyCode.W);
-            jumpHeld = Input.GetKey(KeyCode.W);
-            walkModHeld = Input.GetKey(KeyCode.LeftShift);
-            shieldHeld = Input.GetKey(KeyCode.E);
-            attackPressed = Input.GetKeyDown(KeyCode.F);
+            // Lock out most inputs during these committed states
+            return;
         }
-        else
-        {
-            inputX = (Input.GetKey(KeyCode.RightArrow) ? 1 : 0) - (Input.GetKey(KeyCode.LeftArrow) ? 1 : 0);
-            inputY = (Input.GetKey(KeyCode.UpArrow) ? 1 : 0) - (Input.GetKey(KeyCode.DownArrow) ? 1 : 0);
-            jumpPressed = Input.GetKeyDown(KeyCode.UpArrow);
-            jumpHeld = Input.GetKey(KeyCode.UpArrow);
-            walkModHeld = Input.GetKey(KeyCode.RightShift);
-            shieldHeld = Input.GetKey(KeyCode.RightControl);
-            attackPressed = Input.GetKeyDown(KeyCode.Space);
-        }
-    }
 
-    private void CheckGrounded()
-    {
-        // Use BoxCastAll to check below the player, then filter out the player's own collider
-        RaycastHit2D[] hits = Physics2D.BoxCastAll(boxCol.bounds.center, boxCol.bounds.size * 0.9f, 0f, Vector2.down, 0.1f);
-        
-        bool hitGround = false;
-        foreach (var h in hits)
+
+        bool attackPressed = Input.GetKeyDown(keyAttack);
+        bool shieldPressed = Input.GetKeyDown(keyShieldDodge);
+        bool shieldHeld = Input.GetKey(keyShieldDodge);
+        bool walkModHeld = Input.GetKey(keyWalkModifier);
+       
+        float xInput = 0f;
+        if (Input.GetKey(keyRight)) xInput += 1f;
+        if (Input.GetKey(keyLeft)) xInput -= 1f;
+       
+        float yInput = 0f;
+        if (Input.GetKey(keyUp)) yInput += 1f;
+        if (Input.GetKey(keyDown)) yInput -= 1f;
+
+
+        // --- ATTACKS ---
+        if (attackPressed && isGrounded)
         {
-            if (h.collider != null && h.collider.gameObject != gameObject && !h.collider.isTrigger)
+            DetermineGroundAttack(xInput, yInput, walkModHeld);
+            return;
+        }
+
+
+        // --- DEFENSE (Shields & Dodges) ---
+        if (isGrounded)
+        {
+            if (shieldHeld && !attackPressed)
             {
-                hitGround = true;
-                break;
+                if (Input.GetKeyDown(keyDown))
+                {
+                    StartCoroutine(SpotDodgeRoutine());
+                    return;
+                }
+                else if (Input.GetKeyDown(keyLeft) || Input.GetKeyDown(keyRight))
+                {
+                    StartCoroutine(RollDodgeRoutine(Input.GetKeyDown(keyLeft) ? -1 : 1));
+                    return;
+                }
+                else if (currentState != FighterState.Shielding)
+                {
+                    ChangeState(FighterState.Shielding);
+                }
+            }
+            else if (currentState == FighterState.Shielding && !shieldHeld)
+            {
+                ChangeState(FighterState.Idle);
+                if(shieldBubbleSprite) shieldBubbleSprite.SetActive(false);
+            }
+        }
+        else if (!isGrounded && shieldPressed) // Air Dodge
+        {
+            StartCoroutine(AirDodgeRoutine(xInput, yInput));
+            return;
+        }
+
+
+        // Lock out movement if shielding
+        if (currentState == FighterState.Shielding)
+        {
+            if (shieldBubbleSprite) shieldBubbleSprite.SetActive(true);
+            return;
+        }
+
+
+        // --- JUMPING ---
+        if (Input.GetKeyDown(keyUp))
+        {
+            if (isGrounded)
+            {
+                ChangeState(FighterState.Jumpsquat);
+            }
+            else if (hasDoubleJump)
+            {
+                ExecuteDoubleJump();
             }
         }
 
-        bool wasGrounded = isGrounded;
-        isGrounded = hitGround;
 
-        if (isGrounded && !wasGrounded)
-        {
-            hasDoubleJump = true;
-            hasAirDodged = false;
-            isFastFalling = false;
-            
-            // Wavedash Slide Logic
-            // If we land while air dodging, we maintain horizontal momentum and slide (Wavedash)
-            if (currentState == PlayerState.AirDodge) 
-            {
-                ChangeState(PlayerState.Idle);
-                // Keep the massive velocity from the air dodge to slide on the ground
-            }
-            else if (currentState == PlayerState.InAir || currentState == PlayerState.Freefall)
-            {
-                ChangeState(PlayerState.Idle);
-            }
-        }
-        else if (!isGrounded && wasGrounded && currentState != PlayerState.JumpSquat && currentState != PlayerState.InAir && currentState != PlayerState.Freefall)
-        {
-            // Walked off a ledge!
-            ChangeState(PlayerState.InAir);
-        }
-    }
-
-    private void FlipSprite()
-    {
-        if (currentState == PlayerState.Hitstun || currentState == PlayerState.Jab1 || currentState == PlayerState.Jab2 || currentState == PlayerState.Jab3 || currentState == PlayerState.ForwardTilt || currentState == PlayerState.UpTilt || currentState == PlayerState.DownTilt || currentState == PlayerState.DashAttack || currentState == PlayerState.ForwardSmash || currentState == PlayerState.UpSmash || currentState == PlayerState.DownSmash) return;
-        
-        if (inputX > 0) facingDirection = 1;
-        else if (inputX < 0) facingDirection = -1;
-
-        spriteRenderer.flipX = (facingDirection == -1);
-        
-        // Flip attack hitboxes visually
-        boxingGloveSprite.transform.localPosition = new Vector3(1f * facingDirection, 0, 0);
-        hammerSprite.transform.localPosition = new Vector3(1.2f * facingDirection, 0, 0);
-        bootSprite.transform.localPosition = new Vector3(1f * facingDirection, -0.6f, 0);
-        backBoxingGloveSprite.transform.localPosition = new Vector3(-1f * facingDirection, 0, 0);
-        // Spike helmet stays on top, no need to flip its X position
-    }
-
-    private void ChangeState(PlayerState newState)
-    {
-        currentState = newState;
-        stateFrameTimer = 0;
-        shieldBubble.SetActive(newState == PlayerState.Shield);
-        
-        boxingGloveSprite.SetActive(newState == PlayerState.Jab1 || newState == PlayerState.Jab2 || newState == PlayerState.Jab3 || newState == PlayerState.DashAttack || newState == PlayerState.DownSmash);
-        hammerSprite.SetActive(newState == PlayerState.ForwardTilt || newState == PlayerState.ForwardSmash);
-        spikeHelmetSprite.SetActive(newState == PlayerState.UpTilt);
-        bootSprite.SetActive(newState == PlayerState.DownTilt);
-        upBoxingGloveSprite.SetActive(newState == PlayerState.UpSmash);
-        backBoxingGloveSprite.SetActive(newState == PlayerState.DownSmash);
-    }
-
-    private void ProcessState()
-    {
-        Vector2 vel = rb.velocity;
-
-        switch (currentState)
-        {
-            case PlayerState.Idle:
-                ApplyTraction(ref vel);
-                
-                if (attackPressed) 
-                {
-                    if (walkModHeld && inputY > 0) ChangeState(PlayerState.UpTilt);
-                    else if (inputY > 0) ChangeState(PlayerState.UpSmash);
-                    else if (walkModHeld && inputY < 0) ChangeState(PlayerState.DownTilt);
-                    else if (inputY < 0) ChangeState(PlayerState.DownSmash);
-                    else if (walkModHeld && Mathf.Abs(inputX) > 0) ChangeState(PlayerState.ForwardTilt);
-                    else if (Mathf.Abs(inputX) > 0) ChangeState(PlayerState.ForwardSmash);
-                    else ChangeState(PlayerState.Jab1);
-                }
-                else if (shieldHeld) ChangeState(PlayerState.Shield);
-                else if (jumpPressed) ChangeState(PlayerState.JumpSquat);
-                else if (Mathf.Abs(inputX) > 0)
-                {
-                    if (walkModHeld) ChangeState(PlayerState.Walk);
-                    else ChangeState(PlayerState.InitialDash);
-                }
-                break;
-
-            case PlayerState.Walk:
-                vel.x = inputX * stats.walkSpeed;
-                
-                if (attackPressed)
-                {
-                    if (walkModHeld && inputY > 0) ChangeState(PlayerState.UpTilt);
-                    else if (inputY > 0) ChangeState(PlayerState.UpSmash);
-                    else if (walkModHeld && inputY < 0) ChangeState(PlayerState.DownTilt);
-                    else if (inputY < 0) ChangeState(PlayerState.DownSmash);
-                    else if (walkModHeld && Mathf.Abs(inputX) > 0) ChangeState(PlayerState.ForwardTilt);
-                    else if (Mathf.Abs(inputX) > 0) ChangeState(PlayerState.ForwardSmash);
-                    else ChangeState(PlayerState.Jab1);
-                }
-                else if (jumpPressed) ChangeState(PlayerState.JumpSquat);
-                else if (shieldHeld) ChangeState(PlayerState.Shield);
-                else if (inputX == 0) ChangeState(PlayerState.Idle);
-                else if (!walkModHeld) ChangeState(PlayerState.InitialDash);
-                break;
-
-            case PlayerState.InitialDash:
-                vel.x = facingDirection * stats.initialDashSpeed;
-                
-                if (attackPressed) ChangeState(PlayerState.DashAttack);
-                // Dashdance: Ficking the opposite direction during the initial 15 frame burst
-                else if (inputX != 0 && inputX != facingDirection)
-                {
-                    facingDirection = (int)Mathf.Sign(inputX);
-                    ChangeState(PlayerState.InitialDash); 
-                }
-                else if (jumpPressed) ChangeState(PlayerState.JumpSquat);
-                else if (shieldHeld) ChangeState(PlayerState.Shield); // Shield stop
-                else if (stateFrameTimer >= 15) // Initial dash frames
-                {
-                    if (inputX != 0) ChangeState(PlayerState.Run);
-                    else ChangeState(PlayerState.Idle);
-                }
-                break;
-
-            case PlayerState.Run:
-                vel.x = inputX * stats.runSpeed;
-                
-                if (attackPressed) ChangeState(PlayerState.DashAttack);
-                else if (jumpPressed) ChangeState(PlayerState.JumpSquat);
-                else if (shieldHeld) ChangeState(PlayerState.Shield);
-                else if (inputX == 0) ChangeState(PlayerState.Idle);
-                break;
-
-            case PlayerState.JumpSquat:
-                ApplyTraction(ref vel);
-                
-                if (stateFrameTimer >= stats.jumpsquatFrames)
-                {
-                    ChangeState(PlayerState.InAir);
-                    // Determine if short hop or full hop
-                    vel.y = jumpHeld ? stats.jumpHeight : stats.shortHopHeight; 
-                }
-                break;
-
-            case PlayerState.InAir:
-                ProcessAirPhysics(ref vel);
-                ProcessAirActions(ref vel);
-                break;
-
-            case PlayerState.Freefall:
-                ProcessAirPhysics(ref vel);
-                // Helpless, no actions allowed until landing
-                break;
-
-            case PlayerState.Shield:
-                ApplyTraction(ref vel); // Slide slightly if carrying momentum into shield
-                
-                if (!shieldHeld) ChangeState(PlayerState.Idle);
-                else if (jumpPressed) ChangeState(PlayerState.JumpSquat); // Jump out of shield
-                else if (inputY < 0) ChangeState(PlayerState.SpotDodge);
-                else if (Mathf.Abs(inputX) > 0) ChangeState(PlayerState.Roll);
-                break;
-
-            case PlayerState.SpotDodge:
-                vel = Vector2.zero; // Intangible spin
-                if (stateFrameTimer >= 25) ChangeState(PlayerState.Idle); // 25 frames duration
-                break;
-
-            case PlayerState.Roll:
-                vel.x = facingDirection * (stats.runSpeed * 1.5f); // Fast roll speed
-                vel.y = 0;
-                if (stateFrameTimer >= 30) ChangeState(PlayerState.Idle); // 30 frames duration
-                break;
-
-            case PlayerState.AirDodge:
-                // Directional or Neutral
-                if (stateFrameTimer == 1)
-                {
-                    if (inputX != 0 || inputY != 0)
-                    {
-                        // Directional air dodge burst
-                        Vector2 dodgeDir = new Vector2(inputX, inputY).normalized;
-                        vel = dodgeDir * (stats.airSpeed * 3.5f); 
-                    }
-                    else
-                    {
-                        // Neutral air dodge stalls momentum briefly
-                        vel = Vector2.zero; 
-                    }
-                }
-                
-                // Momentum tapers off, enter freefall
-                if (stateFrameTimer > 10) 
-                {
-                    vel = Vector2.Lerp(vel, Vector2.zero, 0.1f);
-                }
-                if (stateFrameTimer >= 35) ChangeState(PlayerState.Freefall);
-                break;
-
-            case PlayerState.Jab1:
-                ProcessAttack(ref vel, 2f, 15, PlayerState.Jab2);
-                break;
-            case PlayerState.Jab2:
-                ProcessAttack(ref vel, 2f, 15, PlayerState.Jab3);
-                break;
-            case PlayerState.Jab3:
-                ProcessAttack(ref vel, 4f, 25, PlayerState.Idle);
-                break;
-
-            case PlayerState.ForwardTilt:
-                ProcessAttack(ref vel, 8f, 30, PlayerState.Idle);
-                break;
-
-            case PlayerState.UpTilt:
-                // Fast anti-air, 20 frames total
-                ProcessAttack(ref vel, 6f, 20, PlayerState.Idle);
-                break;
-
-            case PlayerState.DownTilt:
-                // Fast low kick combo starter, 20 frames total
-                ProcessAttack(ref vel, 7f, 20, PlayerState.Idle);
-                break;
-
-            case PlayerState.DashAttack:
-                // Running punch, 35 frames total, momentum carries over automatically
-                ProcessAttack(ref vel, 9f, 35, PlayerState.Idle);
-                break;
-
-            case PlayerState.ForwardSmash:
-                // Powerful, slow hammer strike
-                ProcessAttack(ref vel, 30f, 50, PlayerState.Idle);
-                break;
-
-            case PlayerState.UpSmash:
-                // Powerful, slow upward punch
-                ProcessAttack(ref vel, 27.5f, 48, PlayerState.Idle);
-                break;
-
-            case PlayerState.DownSmash:
-                // Strikes both sides simultaneously
-                ProcessAttack(ref vel, 25f, 45, PlayerState.Idle);
-                break;
-
-            case PlayerState.Hitstun:
-                // Knockback decay
-                vel.x = Mathf.Lerp(vel.x, 0, stats.airFriction);
-                vel.y -= stats.gravity;
-                if (stateFrameTimer > currentDamage * 1.5f) // Hitstun scales with damage
-                {
-                    ChangeState(isGrounded ? PlayerState.Idle : PlayerState.InAir);
-                }
-                break;
-        }
-
-        rb.velocity = vel;
-    }
-
-    private void ProcessAirPhysics(ref Vector2 vel)
-    {
-        // Gravity & Fast Falling
-        if (inputY < 0 && vel.y <= 0 && !isFastFalling && currentState != PlayerState.Freefall)
+        // --- FAST FALLING ---
+        if (!isGrounded && Input.GetKeyDown(keyDown) && rb.linearVelocity.y <= 0)
         {
             isFastFalling = true;
         }
+    }
 
-        float maxFall = isFastFalling ? stats.fastFallSpeed : stats.fallSpeed;
-        vel.y -= stats.gravity;
-        if (vel.y < -maxFall) vel.y = -maxFall;
 
-        // Horizontal Air Mobility
-        if (inputX != 0)
+    void FixedUpdate()
+    {
+        frameCounter++;
+        CheckGrounded();
+        Vector2 currentVelocity = rb.linearVelocity;
+
+
+        float xInput = 0f;
+        if (Input.GetKey(keyRight)) xInput += 1f;
+        if (Input.GetKey(keyLeft)) xInput -= 1f;
+
+
+        // State machine logic for movement
+        switch (currentState)
         {
-            float targetSpeed = inputX * stats.airSpeed;
-            float accel = stats.baseAirAcceleration + (Mathf.Abs(inputX) * stats.additionalAirAcceleration);
-            vel.x = Mathf.MoveTowards(vel.x, targetSpeed, accel);
+            case FighterState.Idle:
+                // Apply Traction to slide to a halt
+                currentVelocity.x = Mathf.MoveTowards(currentVelocity.x, 0, traction);
+               
+                if (xInput != 0 && isGrounded)
+                {
+                    facingDirection = xInput > 0 ? 1 : -1;
+                    if (Input.GetKey(keyWalkModifier))
+                    {
+                        ChangeState(FighterState.Walking);
+                    }
+                    else
+                    {
+                        // Start Dash
+                        ChangeState(FighterState.InitialDash);
+                        currentVelocity.x = initialDash * facingDirection;
+                    }
+                }
+                break;
+
+
+            case FighterState.Walking:
+                if (xInput == 0) ChangeState(FighterState.Idle);
+                else
+                {
+                    facingDirection = xInput > 0 ? 1 : -1;
+                    currentVelocity.x = walkSpeed * facingDirection;
+                    if (!Input.GetKey(keyWalkModifier)) ChangeState(FighterState.InitialDash);
+                }
+                break;
+
+
+            case FighterState.InitialDash:
+                stateFrameTimer++;
+               
+                // DASHDANCE: If you press the opposite direction during Initial Dash, instantly dash back
+                if (xInput != 0 && xInput != facingDirection)
+                {
+                    facingDirection = xInput > 0 ? 1 : -1;
+                    ChangeState(FighterState.InitialDash); // Reset dash
+                    currentVelocity.x = initialDash * facingDirection;
+                }
+                else
+                {
+                    currentVelocity.x = initialDash * facingDirection;
+                    if (stateFrameTimer >= 15) // 15 frames of initial dash
+                    {
+                        if (xInput != 0) ChangeState(FighterState.Running);
+                        else ChangeState(FighterState.Idle);
+                    }
+                }
+                break;
+
+
+            case FighterState.Running:
+                if (xInput == 0) ChangeState(FighterState.Idle);
+                else if (xInput != facingDirection)
+                {
+                    // Turnaround skid (simplified to idle with traction)
+                    ChangeState(FighterState.Idle);
+                }
+                else
+                {
+                    currentVelocity.x = runSpeed * facingDirection;
+                }
+                break;
+
+
+            case FighterState.Jumpsquat:
+                stateFrameTimer++;
+                // Apply traction while in jumpsquat (you slide slightly if carrying momentum)
+                currentVelocity.x = Mathf.MoveTowards(currentVelocity.x, 0, traction);
+               
+                // Track if jump is held for full hop
+                if (Input.GetKey(keyUp)) jumpButtonHeldDuringJumpsquat = true;
+
+
+                if (stateFrameTimer >= jumpsquatFrames)
+                {
+                    ExecuteJump();
+                }
+                break;
+
+
+            case FighterState.Airborne:
+                // Horizontal Air Movement
+                if (xInput != 0)
+                {
+                    // Apply air acceleration based on how hard input is (1.0 for keyboard)
+                    float accel = baseAirAcceleration + (additionalAirAcceleration * Mathf.Abs(xInput));
+                    currentVelocity.x += accel * xInput;
+                   
+                    // Cap at air speed
+                    currentVelocity.x = Mathf.Clamp(currentVelocity.x, -airSpeed, airSpeed);
+                }
+                else
+                {
+                    // Air friction
+                    currentVelocity.x = Mathf.MoveTowards(currentVelocity.x, 0, airFriction);
+                }
+
+
+                // Vertical Air Movement (Gravity)
+                if (isFastFalling)
+                {
+                    currentVelocity.y = -fastFallSpeed;
+                }
+                else
+                {
+                    currentVelocity.y -= gravity;
+                    if (currentVelocity.y < -fallSpeed) currentVelocity.y = -fallSpeed;
+                }
+               
+                // Landing check (if we fall into the ground)
+                if (isGrounded && currentVelocity.y <= 0)
+                {
+                    ChangeState(FighterState.Idle);
+                    isFastFalling = false;
+                    hasDoubleJump = true;
+                }
+                break;
+        }
+
+
+        // Flip character visually
+        if (facingDirection == 1) transform.localScale = new Vector3(1, 1, 1);
+        else if (facingDirection == -1) transform.localScale = new Vector3(-1, 1, 1);
+
+
+        rb.linearVelocity = currentVelocity;
+    }
+
+
+    void ExecuteJump()
+    {
+        ChangeState(FighterState.Airborne);
+        isGrounded = false;
+       
+        float jumpForce = jumpButtonHeldDuringJumpsquat ? jumpHeight : shortHopHeight;
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+        jumpButtonHeldDuringJumpsquat = false;
+    }
+
+
+    void ExecuteDoubleJump()
+    {
+        hasDoubleJump = false;
+        isFastFalling = false; // Reset fast fall
+       
+        // Double jump overrides current Y momentum
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, doubleJumpHeight);
+        ChangeState(FighterState.Airborne);
+    }
+
+
+    void DetermineGroundAttack(float xInput, float yInput, bool walkModHeld)
+    {
+        bool isSmashForward = (Time.time - leftPressedTime <= smashTapWindow) || (Time.time - rightPressedTime <= smashTapWindow);
+        bool isSmashUp = (Time.time - upPressedTime <= smashTapWindow);
+        bool isSmashDown = (Time.time - downPressedTime <= smashTapWindow);
+
+
+        if (currentState == FighterState.Running)
+        {
+            StartCoroutine(AttackRoutine("DashAttack", 9f, boxingGloveSprite));
+        }
+        else if (isSmashUp)
+        {
+            StartCoroutine(AttackRoutine("UpSmash", 27.5f, upBoxingGloveSprite));
+        }
+        else if (isSmashDown)
+        {
+            StartCoroutine(DownSmashRoutine());
+        }
+        else if (isSmashForward && xInput != 0)
+        {
+            StartCoroutine(AttackRoutine("ForwardSmash", 30f, hammerSprite));
+        }
+        else if (walkModHeld && yInput > 0)
+        {
+            StartCoroutine(AttackRoutine("UpTilt", 6f, spikeHelmetSprite));
+        }
+        else if (walkModHeld && xInput != 0)
+        {
+            StartCoroutine(AttackRoutine("ForwardTilt", 8f, hammerSprite));
+        }
+        else if (yInput < 0)
+        {
+            StartCoroutine(AttackRoutine("DownTilt", 7f, bootSprite));
         }
         else
         {
-            vel.x = Mathf.MoveTowards(vel.x, 0, stats.airFriction);
+            // Jab Combo Logic
+            ExecuteJabCombo();
         }
     }
 
-    private void ProcessAirActions(ref Vector2 vel)
+
+    void ExecuteJabCombo()
     {
-        // Double Jump
-        if (jumpPressed && hasDoubleJump)
+        if (Time.time - lastAttackTime > attackWindow)
         {
-            hasDoubleJump = false;
-            isFastFalling = false;
-            vel.y = stats.doubleJumpHeight;
-            // Preserves horizontal momentum
+            jabComboStep = 0; // Reset if too slow
         }
 
-        // Air Dodge
-        if (shieldHeld && !hasAirDodged)
+
+        jabComboStep++;
+        lastAttackTime = Time.time;
+
+
+        if (jabComboStep == 1)
         {
-            hasAirDodged = true;
-            ChangeState(PlayerState.AirDodge);
+            StartCoroutine(AttackRoutine("Jab1", 2f, boxingGloveSprite, 0.2f));
+        }
+        else if (jabComboStep == 2)
+        {
+            StartCoroutine(AttackRoutine("Jab2", 2f, boxingGloveSprite, 0.2f));
+        }
+        else if (jabComboStep >= 3)
+        {
+            StartCoroutine(AttackRoutine("Jab3", 4f, boxingGloveSprite, 0.4f));
+            jabComboStep = 0; // Reset after finisher
         }
     }
 
-    private void ApplyTraction(ref Vector2 vel)
+
+    IEnumerator AttackRoutine(string attackName, float damage, GameObject weaponSprite, float duration = 0.3f)
     {
-        // Smoothly stop the character (Critical for wavedash sliding!)
-        vel.x = Mathf.MoveTowards(vel.x, 0, stats.traction);
+        ChangeState(FighterState.Attacking);
+        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y); // Stop horizontal momentum on ground attacks
+       
+        Debug.Log($"{playerID} performed {attackName} for {damage}% damage!");
+
+
+        if (weaponSprite != null) weaponSprite.SetActive(true);
+       
+        // Wait for attack duration
+        yield return new WaitForSeconds(duration);
+       
+        if (weaponSprite != null) weaponSprite.SetActive(false);
+        ChangeState(FighterState.Idle);
     }
 
-    private void ProcessAttack(ref Vector2 vel, float damageDone, int totalFrames, PlayerState nextComboState)
+
+    IEnumerator DownSmashRoutine()
     {
-        ApplyTraction(ref vel); // Halt momentum during attacks
-        
-        // Setup timing: Smash attacks are slower to come out
-        int hitStart = (currentState == PlayerState.ForwardSmash || currentState == PlayerState.UpSmash || currentState == PlayerState.DownSmash) ? 14 : 3;
-        int hitEnd = (currentState == PlayerState.ForwardSmash || currentState == PlayerState.UpSmash || currentState == PlayerState.DownSmash) ? 22 : 8;
-        int hitCheck = hitStart + 1;
+        ChangeState(FighterState.Attacking);
+        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+       
+        Debug.Log($"{playerID} performed Down Smash for 25% damage on both sides!");
 
-        // Attack hitboxes are active based on the move's frame data
-        bool hitboxActive = stateFrameTimer >= hitStart && stateFrameTimer <= hitEnd;
-        
-        GameObject[] activeHitboxes = new GameObject[] { boxingGloveSprite }; // Default
 
-        if (currentState == PlayerState.ForwardTilt || currentState == PlayerState.ForwardSmash) activeHitboxes = new GameObject[] { hammerSprite };
-        else if (currentState == PlayerState.UpTilt) activeHitboxes = new GameObject[] { spikeHelmetSprite };
-        else if (currentState == PlayerState.DownTilt) activeHitboxes = new GameObject[] { bootSprite };
-        else if (currentState == PlayerState.UpSmash) activeHitboxes = new GameObject[] { upBoxingGloveSprite };
-        else if (currentState == PlayerState.DownSmash) activeHitboxes = new GameObject[] { boxingGloveSprite, backBoxingGloveSprite };
+        if (leftBoxingGloveSprite != null) leftBoxingGloveSprite.SetActive(true);
+        if (rightBoxingGloveSprite != null) rightBoxingGloveSprite.SetActive(true);
+       
+        yield return new WaitForSeconds(0.4f);
+       
+        if (leftBoxingGloveSprite != null) leftBoxingGloveSprite.SetActive(false);
+        if (rightBoxingGloveSprite != null) rightBoxingGloveSprite.SetActive(false);
+       
+        ChangeState(FighterState.Idle);
+    }
 
-        if (currentState == PlayerState.ForwardTilt || currentState == PlayerState.ForwardSmash) hammerSprite.SetActive(hitboxActive);
-        else if (currentState == PlayerState.UpTilt) spikeHelmetSprite.SetActive(hitboxActive);
-        else if (currentState == PlayerState.DownTilt) bootSprite.SetActive(hitboxActive);
-        else if (currentState == PlayerState.UpSmash) upBoxingGloveSprite.SetActive(hitboxActive);
-        else if (currentState == PlayerState.DownSmash) 
+
+    IEnumerator SpotDodgeRoutine()
+    {
+        ChangeState(FighterState.SpotDodging);
+        if(shieldBubbleSprite) shieldBubbleSprite.SetActive(false);
+       
+        // Visual indicator of intangibility
+        GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 0.5f);
+        rb.linearVelocity = Vector2.zero;
+       
+        yield return new WaitForSeconds(0.4f); // Invincibility duration
+       
+        GetComponent<SpriteRenderer>().color = Color.white;
+        ChangeState(FighterState.Idle);
+    }
+
+
+    IEnumerator RollDodgeRoutine(int dir)
+    {
+        ChangeState(FighterState.Rolling);
+        if(shieldBubbleSprite) shieldBubbleSprite.SetActive(false);
+       
+        GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 0.5f);
+       
+        float rollSpeed = 6f;
+        rb.linearVelocity = new Vector2(rollSpeed * dir, 0);
+       
+        yield return new WaitForSeconds(0.4f);
+       
+        rb.linearVelocity = Vector2.zero;
+        GetComponent<SpriteRenderer>().color = Color.white;
+        ChangeState(FighterState.Idle);
+    }
+
+
+    IEnumerator AirDodgeRoutine(float dirX, float dirY)
+    {
+        ChangeState(FighterState.AirDodging);
+        GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 0.5f);
+       
+        rb.linearVelocity = Vector2.zero; // Halt current momentum
+       
+        if (dirX != 0 || dirY != 0) // Directional Air Dodge
         {
-            boxingGloveSprite.SetActive(hitboxActive);
-            backBoxingGloveSprite.SetActive(hitboxActive);
+            Vector2 dodgeVelocity = new Vector2(dirX, dirY).normalized * 8f;
+            rb.linearVelocity = dodgeVelocity;
+           
+            // Wait for brief duration while velocity pushes them
+            yield return new WaitForSeconds(0.2f);
+           
         }
-        else boxingGloveSprite.SetActive(hitboxActive);
-
-        // Perform OverlapBox check to hit opponent
-        if (hitboxActive && stateFrameTimer == hitCheck) 
+        else // Neutral Air Dodge
         {
-            System.Collections.Generic.HashSet<PlayerController> alreadyHit = new System.Collections.Generic.HashSet<PlayerController>();
+            yield return new WaitForSeconds(0.3f);
+        }
 
-            foreach (GameObject hitbox in activeHitboxes)
+
+        GetComponent<SpriteRenderer>().color = Color.white;
+       
+        if (!isGrounded)
+        {
+            ChangeState(FighterState.Airborne);
+            hasDoubleJump = false; // Usually lose jump after air dodge
+        }
+    }
+
+
+    void CheckGrounded()
+    {
+        // Simple raycast down from the center of the collider to check for "Ground" layer
+        // Adjust ray length based on your character sprite size.
+        float castDistance = GetComponent<BoxCollider2D>().bounds.extents.y + 0.1f;
+        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, castDistance, LayerMask.GetMask("Default"));
+
+
+        if (hit.collider != null)
+        {
+            if (!isGrounded)
             {
-                Collider2D[] hits = Physics2D.OverlapBoxAll(
-                    hitbox.transform.position,
-                    hitbox.transform.localScale,
-                    0f
-                );
-
-                foreach (Collider2D hit in hits)
+                // We just landed
+                isGrounded = true;
+                isFastFalling = false;
+                hasDoubleJump = true;
+               
+                if (currentState == FighterState.Airborne || currentState == FighterState.AirDodging)
                 {
-                    PlayerController opponent = hit.GetComponent<PlayerController>();
-                    if (opponent != null && opponent != this && !alreadyHit.Contains(opponent) && opponent.currentState != PlayerState.SpotDodge && opponent.currentState != PlayerState.Roll && opponent.currentState != PlayerState.AirDodge)
-                    {
-                        alreadyHit.Add(opponent);
-                        bool isVerticalKnockback = currentState == PlayerState.UpTilt || currentState == PlayerState.DownTilt || currentState == PlayerState.UpSmash;
-                        
-                        // For Down Smash, knock them away based on which glove hit them
-                        int dir = facingDirection;
-                        if (currentState == PlayerState.DownSmash && hitbox == backBoxingGloveSprite) dir = -facingDirection;
-
-                        opponent.TakeDamage(damageDone, dir, isVerticalKnockback);
-                    }
+                    ChangeState(FighterState.Idle);
+                    GetComponent<SpriteRenderer>().color = Color.white; 
                 }
             }
         }
-
-        // Jab Combo linking logic
-        if (nextComboState != PlayerState.Idle && attackPressed && stateFrameTimer > 8)
+        else
         {
-            attackWindowTimer = 1; // Flag that input was pressed early
-        }
-
-        if (stateFrameTimer >= totalFrames)
-        {
-            if (attackWindowTimer == 1)
+            if (isGrounded && currentState != FighterState.Jumpsquat)
             {
-                attackWindowTimer = 0;
-                ChangeState(nextComboState);
-            }
-            else
-            {
-                ChangeState(PlayerState.Idle);
+                // Walked off an edge
+                isGrounded = false;
+                ChangeState(FighterState.Airborne);
             }
         }
     }
 
-    public void TakeDamage(float damageAmount, int attackDirection, bool isVertical = false)
+
+    void DisableAllHitboxes()
     {
-        currentDamage += damageAmount;
-        
-        // Calculate knockback heavily inspired by Smash weight formula
-        float knockbackForce = (currentDamage / 10f) * (200f / stats.weight) + (damageAmount * 2f);
-        
-        if (isVertical)
-        {
-            // Up tilts send opponents mostly upwards for combo potential
-            rb.velocity = new Vector2(attackDirection * knockbackForce * 0.15f, knockbackForce * 1.1f);
-        }
-        else
-        {
-            // Standard attacks send up and away
-            rb.velocity = new Vector2(attackDirection * knockbackForce, knockbackForce * 0.5f); 
-        }
-        
-        ChangeState(PlayerState.Hitstun);
-        
-        Debug.Log($"{gameObject.name} took {damageAmount}% damage! Total: {currentDamage}%");
+        if (boxingGloveSprite) boxingGloveSprite.SetActive(false);
+        if (hammerSprite) hammerSprite.SetActive(false);
+        if (spikeHelmetSprite) spikeHelmetSprite.SetActive(false);
+        if (bootSprite) bootSprite.SetActive(false);
+        if (upBoxingGloveSprite) upBoxingGloveSprite.SetActive(false);
+        if (leftBoxingGloveSprite) leftBoxingGloveSprite.SetActive(false);
+        if (rightBoxingGloveSprite) rightBoxingGloveSprite.SetActive(false);
+        if (shieldBubbleSprite) shieldBubbleSprite.SetActive(false);
+    }
+
+
+    void ChangeState(FighterState newState)
+    {
+        if (currentState == newState) return;
+        currentState = newState;
+        stateFrameTimer = 0;
     }
 }

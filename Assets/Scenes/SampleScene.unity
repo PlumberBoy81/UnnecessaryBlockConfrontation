@@ -203,7 +203,7 @@ Transform:
   m_GameObject: {fileID: 317524595}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.5, y: 0, z: 0}
+  m_LocalPosition: {x: 2.5, y: -0.686, z: 0}
   m_LocalScale: {x: 0.375, y: 0.375, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -298,35 +298,32 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5790177e8be6f42f7b57059887438bdd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerNumber: 1
+  playerID: 0
+  weight: 0
+  initialDash: 0
+  runSpeed: 0
+  walkSpeed: 0
+  traction: 0
+  airFriction: 0
+  airSpeed: 0
+  baseAirAcceleration: 0
+  additionalAirAcceleration: 0
+  gravity: 0
+  fallSpeed: 0
+  fastFallSpeed: 0
+  jumpsquatFrames: 0
+  jumpHeight: 0
+  shortHopHeight: 0
+  doubleJumpHeight: 0
   currentState: 5
-  currentDamage: 0
-  facingDirection: 1
-  spriteRenderer: {fileID: 317524596}
-  shieldBubble: {fileID: 540137337}
   boxingGloveSprite: {fileID: 869259455}
   hammerSprite: {fileID: 0}
   spikeHelmetSprite: {fileID: 0}
   bootSprite: {fileID: 0}
   upBoxingGloveSprite: {fileID: 2012531246}
-  backBoxingGloveSprite: {fileID: 567076518}
-  stats:
-    weight: 0
-    initialDashSpeed: 0
-    runSpeed: 0
-    walkSpeed: 0
-    traction: 0
-    airFriction: 0
-    airSpeed: 0
-    baseAirAcceleration: 0
-    additionalAirAcceleration: 0
-    gravity: 0
-    fallSpeed: 0
-    fastFallSpeed: 0
-    jumpsquatFrames: 0
-    jumpHeight: 0
-    shortHopHeight: 0
-    doubleJumpHeight: 0
+  leftBoxingGloveSprite: {fileID: 0}
+  rightBoxingGloveSprite: {fileID: 0}
+  shieldBubbleSprite: {fileID: 0}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -1349,8 +1346,8 @@ Transform:
   m_GameObject: {fileID: 989680531}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.5, y: 0, z: 0}
-  m_LocalScale: {x: 0.375, y: 0.3745, z: 1}
+  m_LocalPosition: {x: -2.5, y: -0.685, z: 0}
+  m_LocalScale: {x: 0.375, y: 0.375, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1248143125}
@@ -1444,35 +1441,32 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5790177e8be6f42f7b57059887438bdd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerNumber: 0
+  playerID: 0
+  weight: 0
+  initialDash: 0
+  runSpeed: 0
+  walkSpeed: 0
+  traction: 0
+  airFriction: 0
+  airSpeed: 0
+  baseAirAcceleration: 0
+  additionalAirAcceleration: 0
+  gravity: 0
+  fallSpeed: 0
+  fastFallSpeed: 0
+  jumpsquatFrames: 0
+  jumpHeight: 0
+  shortHopHeight: 0
+  doubleJumpHeight: 0
   currentState: 5
-  currentDamage: 0
-  facingDirection: 1
-  spriteRenderer: {fileID: 989680532}
-  shieldBubble: {fileID: 1248143123}
   boxingGloveSprite: {fileID: 1532157334}
   hammerSprite: {fileID: 0}
   spikeHelmetSprite: {fileID: 0}
   bootSprite: {fileID: 0}
   upBoxingGloveSprite: {fileID: 1009331830}
-  backBoxingGloveSprite: {fileID: 1723666809}
-  stats:
-    weight: 98
-    initialDashSpeed: 1.936
-    runSpeed: 1.76
-    walkSpeed: 1.155
-    traction: 0.102
-    airFriction: 0.015
-    airSpeed: 1.208
-    baseAirAcceleration: 0.01
-    additionalAirAcceleration: 0.07
-    gravity: 0.087
-    fallSpeed: 1.5
-    fastFallSpeed: 2.4
-    jumpsquatFrames: 3
-    jumpHeight: 36.33
-    shortHopHeight: 17.54
-    doubleJumpHeight: 36.33
+  leftBoxingGloveSprite: {fileID: 0}
+  rightBoxingGloveSprite: {fileID: 0}
+  shieldBubbleSprite: {fileID: 0}
 --- !u!1 &1009331830
 GameObject:
   m_ObjectHideFlags: 0
