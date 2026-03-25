@@ -494,7 +494,7 @@ GameObject:
   - component: {fileID: 317524600}
   m_Layer: 0
   m_Name: Blue
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -662,7 +662,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerType: 1
-  currentState: 0
+  currentState: 1
   boxingGloveSprite: {fileID: 869259455}
   hammerSprite: {fileID: 452571269}
   spikeHelmetSprite: {fileID: 46191316}
@@ -686,6 +686,7 @@ MonoBehaviour:
     jumpHeight: 0
     shortHopHeight: 0
     doubleJumpHeight: 0
+  unitScale: 0.05
 --- !u!1 &452571269
 GameObject:
   m_ObjectHideFlags: 0
@@ -2310,7 +2311,7 @@ GameObject:
   - component: {fileID: 989680536}
   m_Layer: 0
   m_Name: Red
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -2478,7 +2479,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerType: 0
-  currentState: 5
+  currentState: 1
   boxingGloveSprite: {fileID: 1532157334}
   hammerSprite: {fileID: 817249625}
   spikeHelmetSprite: {fileID: 2093908229}
@@ -2502,6 +2503,7 @@ MonoBehaviour:
     jumpHeight: 0
     shortHopHeight: 0
     doubleJumpHeight: 0
+  unitScale: 0.1
 --- !u!1 &1009331830
 GameObject:
   m_ObjectHideFlags: 0
@@ -4222,7 +4224,7 @@ GameObject:
   - component: {fileID: 2111847865}
   m_Layer: 3
   m_Name: Ground
-  m_TagString: Untagged
+  m_TagString: Ground
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -4237,7 +4239,7 @@ BoxCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 6200000, guid: e1d64373a52f3471c919531915462552, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0

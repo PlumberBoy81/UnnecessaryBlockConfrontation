@@ -31,6 +31,10 @@ public class PlayerController : MonoBehaviour
     [Header("Assigned Stats")]
     public CharacterStats stats;
 
+    [Header("Engine Settings")]
+    public float unitScale = 0.1f;
+
+
     // Internal physics variables
     private Rigidbody2D rb;
     private Vector2 velocity;
@@ -46,11 +50,16 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
-        rb.isKinematic = true; // We use kinematic because we are calculating custom frame-perfect physics
+        
+        // --- NEW PHYSICS SETUP ---
+        rb.bodyType = RigidbodyType2D.Dynamic; // Allows collision with the ground
+        rb.gravityScale = 0f;                  // Turns off Unity's gravity (we use our own!)
+        rb.freezeRotation = true;              // Prevents the squares from tumbling over
 
         AssignInputsAndStats();
         HideAllSprites();
     }
+
 
     void Update()
     {
@@ -64,9 +73,8 @@ public class PlayerController : MonoBehaviour
         {
             ApplyPhysics();
         }
-        
-        // Apply our custom velocity manually
-        rb.MovePosition(rb.position + velocity);
+       
+        rb.linearVelocity = velocity * (1f / Time.fixedDeltaTime) * unitScale; 
     }
 
     private void AssignInputsAndStats()
@@ -82,7 +90,7 @@ public class PlayerController : MonoBehaviour
                 weight = 98, initialDash = 1.936f, runSpeed = 1.76f, walkSpeed = 1.155f, 
                 traction = 0.102f, airFriction = 0.015f, airSpeed = 1.208f, baseAirAccel = 0.01f, 
                 addAirAccel = 0.07f, gravity = 0.087f, fallSpeed = 1.5f, fastFallSpeed = 2.4f, 
-                jumpsquatFrames = 3, jumpHeight = 3.633f, shortHopHeight = 1.754f, doubleJumpHeight = 3.633f
+                jumpsquatFrames = 3, jumpHeight = 36.33f, shortHopHeight = 17.54f, doubleJumpHeight = 36.33f
             };
             GetComponent<SpriteRenderer>().color = Color.red;
         }
@@ -97,7 +105,7 @@ public class PlayerController : MonoBehaviour
                 weight = 86, initialDash = 2.31f, runSpeed = 3.85f, walkSpeed = 1.444f, 
                 traction = 0.138f, airFriction = 0.01f, airSpeed = 1.208f, baseAirAccel = 0.01f, 
                 addAirAccel = 0.04f, gravity = 0.09f, fallSpeed = 1.65f, fastFallSpeed = 2.64f, 
-                jumpsquatFrames = 3, jumpHeight = 3.5f, shortHopHeight = 1.689f, doubleJumpHeight = 3.5f
+                jumpsquatFrames = 3, jumpHeight = 35f, shortHopHeight = 16.89f, doubleJumpHeight = 35f
             };
             GetComponent<SpriteRenderer>().color = Color.blue;
         }
@@ -294,7 +302,6 @@ public class PlayerController : MonoBehaviour
         if(shieldBubble) shieldBubble.SetActive(false);
     }
 
-    // Ground Check (Attach a BoxCollider2D to act as the floor)
     private void OnCollisionEnter2D(Collision2D col)
     {
         if (col.gameObject.CompareTag("Ground")) currentState = State.Grounded;
@@ -304,3 +311,5 @@ public class PlayerController : MonoBehaviour
         if (col.gameObject.CompareTag("Ground") && currentState == State.Grounded) currentState = State.Airborne;
     }
 }
+
+
