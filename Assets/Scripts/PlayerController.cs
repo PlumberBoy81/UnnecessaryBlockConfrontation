@@ -121,12 +121,14 @@ public class PlayerController : MonoBehaviour
         // --- DEFENSE ---
         if (Input.GetKey(shieldKey))
         {
-            if (currentState == State.Grounded)
+            if (currentState == State.Grounded || currentState == State.Shielding) // FIX: Allow dodging while shielding
             {
                 if (Input.GetKeyDown(downKey)) { ExecuteSpotDodge(); return; }
                 if (Input.GetKeyDown(leftKey) || Input.GetKeyDown(rightKey)) { ExecuteRoll(); return; }
+                
                 currentState = State.Shielding;
                 shieldBubble.SetActive(true);
+                velocity.x = 0; // FIX: Stop sliding when shield is pulled up
             }
             else if (currentState == State.Airborne && Input.GetKeyDown(shieldKey))
             {
@@ -150,8 +152,8 @@ public class PlayerController : MonoBehaviour
         // --- MOVEMENT & JUMPING ---
         if (Input.GetKeyDown(upKey))
         {
-            if (currentState == State.Grounded) StartJumpsquat();
-            else if (jumpsRemaining > 0) ExecuteJump(stats.doubleJumpHeight); // Double Jump
+            if (currentState == State.Grounded || currentState == State.Shielding) StartJumpsquat();
+            else if (currentState == State.Airborne && jumpsRemaining > 0) ExecuteJump(stats.doubleJumpHeight, true); // FIX: Flag as double jump
         }
 
         if (currentState == State.Airborne && Input.GetKeyDown(downKey) && velocity.y < 0)
@@ -209,18 +211,21 @@ public class PlayerController : MonoBehaviour
     // --- JUMP LOGIC ---
     private void StartJumpsquat()
     {
-        // In a full game, you'd yield return new WaitForFrames(stats.jumpsquatFrames)
-        // Check if button is still held to determine Full Hop vs Short Hop
         float height = Input.GetKey(upKey) ? stats.jumpHeight : stats.shortHopHeight;
-        ExecuteJump(height);
+        
+        // FIX: Cap horizontal momentum to air speed when leaving the ground
+        velocity.x = Mathf.Clamp(velocity.x, -stats.airSpeed, stats.airSpeed); 
+        
+        ExecuteJump(height, false);
     }
 
-    private void ExecuteJump(float height)
+    private void ExecuteJump(float height, bool isDoubleJump)
     {
         currentState = State.Airborne;
-        // Smash physics jump velocity formula based on gravity and desired height
         velocity.y = Mathf.Sqrt(2f * stats.gravity * height); 
-        if (jumpsRemaining > 0 && currentState == State.Airborne) jumpsRemaining--;
+        
+        // FIX: Only consume a jump if we are actually double jumping
+        if (isDoubleJump) jumpsRemaining--; 
     }
 
     // --- COMBAT LOGIC ---
@@ -282,9 +287,22 @@ public class PlayerController : MonoBehaviour
     private void ExecuteAirDodge(int dirX, int dirY)
     {
         currentState = State.Dodging;
-        // Wavedash logic would intercept here if close to ground
-        if (dirX == 0 && dirY == 0) Debug.Log($"{playerType} Neutral Air Dodged!");
-        else Debug.Log($"{playerType} Directional Air Dodged: {dirX}, {dirY}");
+        shieldBubble.SetActive(false); // Make sure shield bubble isn't showing in air
+
+        // FIX: Halt current momentum so they don't float into the stratosphere
+        velocity = Vector2.zero; 
+
+        // Apply a burst of momentum for directional air dodges
+        if (dirX != 0 || dirY != 0) 
+        {
+            velocity = new Vector2(dirX, dirY).normalized * stats.airSpeed * 2f;
+            Debug.Log($"{playerType} Directional Air Dodged: {dirX}, {dirY}");
+        }
+        else 
+        {
+            Debug.Log($"{playerType} Neutral Air Dodged!");
+        }
+
         Invoke("ResetAirborne", 0.4f);
     }
 
@@ -311,5 +329,3 @@ public class PlayerController : MonoBehaviour
         if (col.gameObject.CompareTag("Ground") && currentState == State.Grounded) currentState = State.Airborne;
     }
 }
-
-
