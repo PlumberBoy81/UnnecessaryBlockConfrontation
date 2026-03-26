@@ -12,6 +12,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("Sprites/Objects (Assign in Inspector)")]
     public GameObject boxingGloveSprite;
+    public GameObject backBoxingGloveSprite;
     public GameObject hammerSprite;
     public GameObject spikeHelmetSprite;
     public GameObject bootSprite;
@@ -242,8 +243,10 @@ public class PlayerController : MonoBehaviour
         }
         else if (Input.GetKey(downKey))
         {
-            if (Input.GetKeyDown(downKey) && Input.GetKeyDown(attackKey)) ExecuteAttack("DownSmash", boxingGloveSprite, 25f);
-            else ExecuteAttack("DownTilt", bootSprite, 7f);
+            if (Input.GetKeyDown(downKey) && Input.GetKeyDown(attackKey)) 
+                ExecuteAttack("DownSmash", boxingGloveSprite, 25f, backBoxingGloveSprite);
+            else 
+                ExecuteAttack("DownTilt", bootSprite, 7f);
         }
         else if (xInput != 0)
         {
@@ -257,14 +260,48 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void ExecuteAttack(string attackName, GameObject spriteToShow, float damage)
+    private void ExecuteAttack(string attackName, GameObject spriteToShow, float damage, GameObject secondarySprite = null)
     {
         Debug.Log($"{playerType} performed {attackName} dealing {damage}% damage!");
         HideAllSprites();
-        if (spriteToShow != null) spriteToShow.SetActive(true);
         
-        // Reset state after attack completes (requires Coroutine or Animation Event in full game)
+        if (spriteToShow != null) spriteToShow.SetActive(true);
+        if (secondarySprite != null) secondarySprite.SetActive(true); // Turns on the back glove for D-Smash
+        
+        // --- HITBOX & KNOCKBACK LOGIC ---
+        // Check for colliders within a 1.5 unit radius
+        Collider2D[] hitPlayers = Physics2D.OverlapCircleAll(transform.position, 1.5f); 
+        foreach (Collider2D hit in hitPlayers)
+        {
+            PlayerController enemyPlayer = hit.GetComponent<PlayerController>();
+            
+            // If we found a player, and it's NOT us...
+            if (enemyPlayer != null && enemyPlayer != this)
+            {
+                // Calculate knockback direction (away from attacker)
+                Vector2 knockbackDir = (enemyPlayer.transform.position - transform.position).normalized;
+                knockbackDir.y += 0.5f; // Add an upward angle to the hit
+                
+                enemyPlayer.TakeHit(damage, knockbackDir);
+            }
+        }
+
         Invoke("ResetToGrounded", 0.3f); 
+    }
+
+    // NEW: Handles taking damage and flying backward
+    public void TakeHit(float damage, Vector2 knockbackDir)
+    {
+        if (currentState == State.Dodging) return; // Invincibility frames!
+        
+        currentState = State.Hitstun;
+        HideAllSprites();
+        
+        // Basic Smash Knockback Math: heavier characters fly less
+        float knockbackForce = damage * (100f / stats.weight); 
+        velocity = knockbackDir.normalized * knockbackForce * 0.2f; 
+        
+        Invoke("ResetAirborne", 0.5f); // Recover from hitstun after 0.5 seconds
     }
 
     private void ExecuteJab()
@@ -282,8 +319,28 @@ public class PlayerController : MonoBehaviour
     }
 
     // --- DEFENSIVE MOVES ---
-    private void ExecuteSpotDodge() { Debug.Log($"{playerType} Spot Dodged!"); currentState = State.Dodging; Invoke("ResetToGrounded", 0.4f); }
-    private void ExecuteRoll() { Debug.Log($"{playerType} Rolled!"); currentState = State.Dodging; Invoke("ResetToGrounded", 0.5f); }
+    private void ExecuteSpotDodge() 
+    { 
+        Debug.Log($"{playerType} Spot Dodged!"); 
+        currentState = State.Dodging; 
+        shieldBubble.SetActive(false); 
+        velocity = Vector2.zero;
+        Invoke("ResetToGrounded", 0.4f); 
+    }
+
+    private void ExecuteRoll() 
+    { 
+        Debug.Log($"{playerType} Rolled!"); 
+        currentState = State.Dodging; 
+        shieldBubble.SetActive(false);
+        
+        int dirX = Input.GetKey(leftKey) ? -1 : 1;
+        
+        velocity = new Vector2(dirX * stats.runSpeed * 1.5f, 0); 
+        
+        Invoke("ResetToGrounded", 0.5f); 
+    }
+
     private void ExecuteAirDodge(int dirX, int dirY)
     {
         currentState = State.Dodging;
