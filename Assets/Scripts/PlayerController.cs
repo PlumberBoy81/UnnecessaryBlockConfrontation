@@ -28,6 +28,10 @@ public class PlayerController : MonoBehaviour
         public int jumpsquatFrames;
         public float jumpHeight, shortHopHeight, doubleJumpHeight;
     }
+
+    [Header("Current Status")]
+    public float currentDamage = 0f; // Tracks the player's percentage!
+    public Vector3 respawnPoint = new Vector3(0, 5, 0); // Where they drop in after a K.O.
     
     [Header("Assigned Stats")]
     public CharacterStats stats;
