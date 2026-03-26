@@ -377,12 +377,35 @@ public class PlayerController : MonoBehaviour
         if(shieldBubble) shieldBubble.SetActive(false);
     }
 
+    // --- GROUND COLLISIONS & WAVEDASHING ---
     private void OnCollisionEnter2D(Collision2D col)
     {
-        if (col.gameObject.CompareTag("Ground")) currentState = State.Grounded;
+        if (col.gameObject.CompareTag("Ground")) 
+        {
+            if (currentState == State.Dodging && velocity.y < 0)
+            {
+                if (Mathf.Abs(velocity.x) > 0.1f)
+                {
+                    Debug.Log($"{playerType} perfectly WAVEDASHED!");
+                    velocity.x *= 1.5f; 
+                }
+            }
+
+            currentState = State.Grounded;
+            velocity.y = 0;
+            jumpsRemaining = 1;
+            isFastFalling = false;
+
+            CancelInvoke("ResetAirborne");
+            CancelInvoke("ResetToGrounded");
+        }
     }
+
     private void OnCollisionExit2D(Collision2D col)
     {
-        if (col.gameObject.CompareTag("Ground") && currentState == State.Grounded) currentState = State.Airborne;
+        if (col.gameObject.CompareTag("Ground") && currentState == State.Grounded) 
+        {
+            currentState = State.Airborne;
+        }
     }
 }

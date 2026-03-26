@@ -888,7 +888,7 @@ MonoBehaviour:
   playerType: 1
   currentState: 1
   boxingGloveSprite: {fileID: 869259455}
-  backBoxingGloveSprite: {fileID: 0}
+  backBoxingGloveSprite: {fileID: 567076518}
   hammerSprite: {fileID: 452571269}
   spikeHelmetSprite: {fileID: 46191316}
   bootSprite: {fileID: 10916886}
@@ -2706,7 +2706,7 @@ MonoBehaviour:
   playerType: 0
   currentState: 1
   boxingGloveSprite: {fileID: 1532157334}
-  backBoxingGloveSprite: {fileID: 0}
+  backBoxingGloveSprite: {fileID: 1723666809}
   hammerSprite: {fileID: 817249625}
   spikeHelmetSprite: {fileID: 2093908229}
   bootSprite: {fileID: 1400525844}
