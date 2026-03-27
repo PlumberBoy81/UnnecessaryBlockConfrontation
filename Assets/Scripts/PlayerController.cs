@@ -30,8 +30,8 @@ public class PlayerController : MonoBehaviour
     }
 
     [Header("Current Status")]
-    public float currentDamage = 0f; // Tracks the player's percentage!
-    public Vector3 respawnPoint = new Vector3(0, 5, 0); // Where they drop in after a K.O.
+    public float currentDamage = 0f; 
+    public Vector3 respawnPoint = new Vector3(0, 5, 0); 
     
     [Header("Assigned Stats")]
     public CharacterStats stats;
@@ -294,18 +294,27 @@ public class PlayerController : MonoBehaviour
     }
 
     // NEW: Handles taking damage and flying backward
-    public void TakeHit(float damage, Vector2 knockbackDir)
+    public void TakeHit(float incomingDamage, Vector2 knockbackDir)
     {
         if (currentState == State.Dodging) return; // Invincibility frames!
         
         currentState = State.Hitstun;
         HideAllSprites();
         
-        // Basic Smash Knockback Math: heavier characters fly less
-        float knockbackForce = damage * (100f / stats.weight); 
+        // Accumulate damage like in Smash!
+        currentDamage += incomingDamage;
+        Debug.Log($"{playerType} is now at {currentDamage}%!");
+        
+        // Updated Knockback Math: Scales with accumulated damage and character weight
+        // (Current Damage * Attack Power) / Weight
+        float knockbackForce = (currentDamage * incomingDamage) / stats.weight; 
+        
+        // Ensure there is always at least a little knockback
+        knockbackForce = Mathf.Clamp(knockbackForce, 5f, 100f); 
+        
         velocity = knockbackDir.normalized * knockbackForce * 0.2f; 
         
-        Invoke("ResetAirborne", 0.5f); // Recover from hitstun after 0.5 seconds
+        Invoke("ResetAirborne", 0.5f); // Recover from hitstun
     }
 
     private void ExecuteJab()
@@ -411,5 +420,29 @@ public class PlayerController : MonoBehaviour
         {
             currentState = State.Airborne;
         }
+    }
+
+    private void OnTriggerEnter2D(Collider2D col)
+    {
+        if (col.CompareTag("BlastZone"))
+        {
+            ExecuteKO();
+        }
+    }
+
+    private void ExecuteKO()
+    {
+        Debug.Log($"GAME! {playerType} was blasted off the screen!");
+        
+        currentDamage = 0f;
+        velocity = Vector2.zero;
+        rb.linearVelocity = Vector2.zero;
+        
+        rb.position = respawnPoint; 
+        transform.position = respawnPoint; 
+        
+        currentState = State.Airborne; 
+        CancelInvoke(); 
+        HideAllSprites();
     }
 }
