@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 using System;
 
 public class PlayerController : MonoBehaviour
@@ -6,7 +8,7 @@ public class PlayerController : MonoBehaviour
     public enum PlayerID { Player1_Red, Player2_Blue }
     public PlayerID playerType;
 
-    public enum State { Grounded, Airborne, Shielding, Dodging, Attacking, Hitstun }
+    public enum State { Grounded, Airborne, Shielding, Dodging, Attacking, Hitstun, ChargingSmash };
     [Header("Current State")]
     public State currentState = State.Grounded;
 
@@ -32,6 +34,7 @@ public class PlayerController : MonoBehaviour
     [Header("Current Status")]
     public float currentDamage = 0f; 
     public Vector3 respawnPoint = new Vector3(0, 5, 0); 
+    public TextMeshProUGUI damageUI; // NEW: The text element on the screen
     
     [Header("Assigned Stats")]
     public CharacterStats stats;
@@ -39,6 +42,9 @@ public class PlayerController : MonoBehaviour
     [Header("Engine Settings")]
     public float unitScale = 0.1f;
 
+    [Header("Smash Charge Settings")]
+    public float maxChargeTime = 1f; // 60 frames (1 second)
+    public float maxChargeMultiplier = 1.4f; // Smash standard: 1.4x damage at max charge
 
     // Internal physics variables
     private Rigidbody2D rb;
@@ -48,6 +54,11 @@ public class PlayerController : MonoBehaviour
     private int jumpsRemaining = 1;
     private int currentJabCombo = 0;
     private float lastJabTime = 0f;
+    private float chargeTimer = 0f;
+    private string pendingAttackName;
+    private float pendingDamage;
+    private GameObject pendingSprite;
+    private GameObject pendingSecondarySprite;
 
     // Inputs
     private KeyCode upKey, downKey, leftKey, rightKey, walkModKey, attackKey, shieldKey;
@@ -118,6 +129,32 @@ public class PlayerController : MonoBehaviour
 
     private void HandleInputs()
     {
+        // --- CHARGE SMASH INTERCEPT ---
+        if (currentState == State.ChargingSmash)
+        {
+            chargeTimer += Time.deltaTime;
+            
+            // Visual Shake Indicator
+            if (chargeTimer < maxChargeTime)
+            {
+                // Rapidly jitter the sprite left and right by 0.05 units
+                float shakeAmt = 0.05f;
+                transform.position = new Vector3(rb.position.x + UnityEngine.Random.Range(-shakeAmt, shakeAmt), rb.position.y, transform.position.z);
+            }
+            else
+            {
+                // Max power reached! Stop shaking and lock into place.
+                transform.position = new Vector3(rb.position.x, rb.position.y, transform.position.z);
+            }
+
+            // When the player lets go of the attack key, release the smash!
+            if (Input.GetKeyUp(attackKey))
+            {
+                ReleaseSmash();
+            }
+            return; // CRITICAL: Stop reading other inputs so they can't jump/run while charging
+        }
+
         if (currentState == State.Attacking || currentState == State.Dodging || currentState == State.Hitstun) return;
 
         int xInput = (Input.GetKey(rightKey) ? 1 : 0) - (Input.GetKey(leftKey) ? 1 : 0);
@@ -240,21 +277,23 @@ public class PlayerController : MonoBehaviour
 
         bool smashInput = (Input.GetKeyDown(leftKey) || Input.GetKeyDown(rightKey)) && Input.GetKeyDown(attackKey);
         
-        if (Input.GetKey(upKey))
-        {
-            if (Input.GetKeyDown(upKey) && Input.GetKeyDown(attackKey)) ExecuteAttack("UpSmash", upBoxingGloveSprite, 27.5f);
-            else ExecuteAttack("UpTilt", spikeHelmetSprite, 6f);
-        }
-        else if (Input.GetKey(downKey))
+        if (Input.GetKey(downKey))
         {
             if (Input.GetKeyDown(downKey) && Input.GetKeyDown(attackKey)) 
-                ExecuteAttack("DownSmash", boxingGloveSprite, 25f, backBoxingGloveSprite);
+                StartChargeSmash("DownSmash", boxingGloveSprite, 25f, backBoxingGloveSprite); // CHANGED
             else 
                 ExecuteAttack("DownTilt", bootSprite, 7f);
+        }     
+        else if (Input.GetKey(upKey))
+        {
+            if (Input.GetKeyDown(upKey) && Input.GetKeyDown(attackKey)) 
+                StartChargeSmash("UpSmash", upBoxingGloveSprite, 20f); // CHANGED
+            else 
+                ExecuteAttack("UpTilt", upBoxingGloveSprite, 8f);
         }
         else if (xInput != 0)
         {
-            if (smashInput) ExecuteAttack("ForwardSmash", hammerSprite, 30f);
+            if (smashInput) StartChargeSmash("ForwardSmash", hammerSprite, 30f);
             else if (Mathf.Abs(velocity.x) > stats.walkSpeed && !isWalkMod) ExecuteAttack("DashAttack", boxingGloveSprite, 9f);
             else ExecuteAttack("ForwardTilt", hammerSprite, 8f);
         }
@@ -296,25 +335,27 @@ public class PlayerController : MonoBehaviour
     // NEW: Handles taking damage and flying backward
     public void TakeHit(float incomingDamage, Vector2 knockbackDir)
     {
-        if (currentState == State.Dodging) return; // Invincibility frames!
+        if (currentState == State.Dodging) return; 
         
         currentState = State.Hitstun;
         HideAllSprites();
         
-        // Accumulate damage like in Smash!
+        // Accumulate damage!
         currentDamage += incomingDamage;
-        Debug.Log($"{playerType} is now at {currentDamage}%!");
         
-        // Updated Knockback Math: Scales with accumulated damage and character weight
-        // (Current Damage * Attack Power) / Weight
+        // --- NEW: UPDATE THE UI ---
+        if (damageUI != null) 
+        {
+            damageUI.text = Mathf.FloorToInt(currentDamage).ToString() + "%";
+        }
+        
+        // Knockback Math
         float knockbackForce = (currentDamage * incomingDamage) / stats.weight; 
-        
-        // Ensure there is always at least a little knockback
         knockbackForce = Mathf.Clamp(knockbackForce, 5f, 100f); 
         
         velocity = knockbackDir.normalized * knockbackForce * 0.2f; 
         
-        Invoke("ResetAirborne", 0.5f); // Recover from hitstun
+        Invoke("ResetAirborne", 0.5f); 
     }
 
     private void ExecuteJab()
@@ -329,6 +370,38 @@ public class PlayerController : MonoBehaviour
         ExecuteAttack($"Jab hit {currentJabCombo}", boxingGloveSprite, damage);
 
         if (currentJabCombo >= 3) currentJabCombo = 0;
+    }
+
+    private void StartChargeSmash(string attackName, GameObject sprite, float baseDamage, GameObject secondary = null)
+    {
+        currentState = State.ChargingSmash;
+        velocity = Vector2.zero; // Stop sliding
+        rb.linearVelocity = Vector2.zero;
+        chargeTimer = 0f;
+        
+        // Store the attack details for when we release the button
+        pendingAttackName = attackName;
+        pendingDamage = baseDamage;
+        pendingSprite = sprite;
+        pendingSecondarySprite = secondary;
+        
+        // Show the wind-up frame (using the attack sprite for now)
+        HideAllSprites();
+        if (pendingSprite != null) pendingSprite.SetActive(true);
+        if (pendingSecondarySprite != null) pendingSecondarySprite.SetActive(true);
+    }
+
+    private void ReleaseSmash()
+    {
+        // Snap position back to perfectly center in case they were shaking
+        transform.position = new Vector3(rb.position.x, rb.position.y, transform.position.z);
+        
+        // Calculate the damage multiplier (Mathf.Lerp smoothly scales from 1.0 to 1.4 over 1 second)
+        float chargePercent = Mathf.Clamp01(chargeTimer / maxChargeTime);
+        float finalDamage = pendingDamage * Mathf.Lerp(1f, maxChargeMultiplier, chargePercent);
+        
+        // Execute the attack with the newly scaled damage!
+        ExecuteAttack(pendingAttackName, pendingSprite, finalDamage, pendingSecondarySprite);
     }
 
     // --- DEFENSIVE MOVES ---
@@ -434,7 +507,15 @@ public class PlayerController : MonoBehaviour
     {
         Debug.Log($"GAME! {playerType} was blasted off the screen!");
         
+        // Reset stats
         currentDamage = 0f;
+        
+        // --- NEW: RESET THE UI ---
+        if (damageUI != null) 
+        {
+            damageUI.text = "0%";
+        }
+
         velocity = Vector2.zero;
         rb.linearVelocity = Vector2.zero;
         
