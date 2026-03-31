@@ -108,7 +108,6 @@ public class PlayerController : MonoBehaviour
                 addAirAccel = 0.07f, gravity = 0.087f, fallSpeed = 1.5f, fastFallSpeed = 2.4f, 
                 jumpsquatFrames = 3, jumpHeight = 36.33f, shortHopHeight = 17.54f, doubleJumpHeight = 36.33f
             };
-            GetComponent<SpriteRenderer>().color = Color.red;
         }
         else
         {
@@ -123,7 +122,6 @@ public class PlayerController : MonoBehaviour
                 addAirAccel = 0.04f, gravity = 0.09f, fallSpeed = 1.65f, fastFallSpeed = 2.64f, 
                 jumpsquatFrames = 3, jumpHeight = 35f, shortHopHeight = 16.89f, doubleJumpHeight = 35f
             };
-            GetComponent<SpriteRenderer>().color = Color.blue;
         }
     }
 
