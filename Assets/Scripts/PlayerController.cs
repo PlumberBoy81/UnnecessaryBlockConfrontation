@@ -8,7 +8,7 @@ public class PlayerController : MonoBehaviour
     public enum PlayerID { Player1_Red, Player2_Blue }
     public PlayerID playerType;
 
-    public enum State { Grounded, Airborne, Shielding, Dodging, Attacking, Hitstun, ChargingSmash };
+   public enum State { Grounded, Airborne, Shielding, Dodging, Hitstun, ChargingSmash };
     [Header("Current State")]
     public State currentState = State.Grounded;
 
@@ -35,12 +35,20 @@ public class PlayerController : MonoBehaviour
     public float currentDamage = 0f; 
     public Vector3 respawnPoint = new Vector3(0, 5, 0); 
     public TextMeshProUGUI damageUI; // NEW: The text element on the screen
+
+    public bool isAttacking = false;
     
     [Header("Assigned Stats")]
     public CharacterStats stats;
 
     [Header("Engine Settings")]
     public float unitScale = 0.1f;
+
+    [Header("Input Buffer")]
+    public float smashWindow = 0.2f; // Gives you 0.2 seconds to hit attack after pressing a direction
+    private float lastDownPress = -10f;
+    private float lastUpPress = -10f;
+    private float lastSidePress = -10f;
 
     [Header("Smash Charge Settings")]
     public float maxChargeTime = 1f; // 60 frames (1 second)
@@ -49,7 +57,6 @@ public class PlayerController : MonoBehaviour
     // Internal physics variables
     private Rigidbody2D rb;
     private Vector2 velocity;
-    private int jumpsquatCounter = 0;
     private bool isFastFalling = false;
     private int jumpsRemaining = 1;
     private int currentJabCombo = 0;
@@ -85,7 +92,8 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (currentState == State.Grounded || currentState == State.Airborne)
+        // ADDED Hitstun so players fall in an arc when knocked back!
+        if (currentState == State.Grounded || currentState == State.Airborne || currentState == State.Hitstun)
         {
             ApplyPhysics();
         }
@@ -153,8 +161,25 @@ public class PlayerController : MonoBehaviour
             return; // CRITICAL: Stop reading other inputs so they can't jump/run while charging
         }
 
-        if (currentState == State.Attacking || currentState == State.Dodging || currentState == State.Hitstun) return;
+        // Track the timestamp of directional presses for Smash Attacks
+        if (Input.GetKeyDown(downKey)) lastDownPress = Time.time;
+        if (Input.GetKeyDown(upKey)) lastUpPress = Time.time;
+        if (Input.GetKeyDown(leftKey) || Input.GetKeyDown(rightKey)) lastSidePress = Time.time;
 
+        if (currentState == State.Dodging || currentState == State.Hitstun) return;
+
+        if (isAttacking)
+        {
+            if (currentState == State.Grounded)
+            {
+                velocity.x = Mathf.MoveTowards(velocity.x, 0, 40f * Time.deltaTime); 
+                rb.linearVelocity = new Vector2(velocity.x, rb.linearVelocity.y); 
+            }
+            
+            // 3. Return early so they can't input new jumps or direction changes
+            return; 
+        }
+        
         int xInput = (Input.GetKey(rightKey) ? 1 : 0) - (Input.GetKey(leftKey) ? 1 : 0);
         bool isWalkModifier = Input.GetKey(walkModKey);
 
@@ -271,27 +296,32 @@ public class PlayerController : MonoBehaviour
     // --- COMBAT LOGIC ---
     private void DetermineGroundAttack(int xInput, bool isWalkMod)
     {
-        currentState = State.Attacking;
-
         bool smashInput = (Input.GetKeyDown(leftKey) || Input.GetKeyDown(rightKey)) && Input.GetKeyDown(attackKey);
         
         if (Input.GetKey(downKey))
         {
-            if (Input.GetKeyDown(downKey) && Input.GetKeyDown(attackKey)) 
-                StartChargeSmash("DownSmash", boxingGloveSprite, 25f, backBoxingGloveSprite); // CHANGED
-            else 
-                ExecuteAttack("DownTilt", bootSprite, 7f);
-        }     
+            if (Input.GetKeyDown(attackKey)) 
+            {
+                // If the time between tapping Down and pressing Attack is less than 0.2s, it's a Smash!
+                if (Time.time - lastDownPress <= smashWindow)
+                    StartChargeSmash("DownSmash", boxingGloveSprite, 25f, backBoxingGloveSprite);
+                else 
+                    ExecuteAttack("DownTilt", bootSprite, 7f);
+            }
+        }        
         else if (Input.GetKey(upKey))
         {
-            if (Input.GetKeyDown(upKey) && Input.GetKeyDown(attackKey)) 
-                StartChargeSmash("UpSmash", upBoxingGloveSprite, 20f); // CHANGED
-            else 
-                ExecuteAttack("UpTilt", upBoxingGloveSprite, 8f);
+            if (Input.GetKeyDown(attackKey)) 
+            {
+                if (Time.time - lastUpPress <= smashWindow)
+                    StartChargeSmash("UpSmash", upBoxingGloveSprite, 20f);
+                else 
+                    ExecuteAttack("UpTilt", spikeHelmetSprite, 8f);
+            }
         }
         else if (xInput != 0)
         {
-            if (smashInput) StartChargeSmash("ForwardSmash", hammerSprite, 30f);
+            if (smashInput) if (Time.time - lastSidePress <= smashWindow) StartChargeSmash("ForwardSmash", hammerSprite, 30f);
             else if (Mathf.Abs(velocity.x) > stats.walkSpeed && !isWalkMod) ExecuteAttack("DashAttack", boxingGloveSprite, 9f);
             else ExecuteAttack("ForwardTilt", hammerSprite, 8f);
         }
@@ -304,6 +334,9 @@ public class PlayerController : MonoBehaviour
     private void ExecuteAttack(string attackName, GameObject spriteToShow, float damage, GameObject secondarySprite = null)
     {
         Debug.Log($"{playerType} performed {attackName} dealing {damage}% damage!");
+        
+        isAttacking = true; // CHANGED: We are now attacking, but we remain Grounded or Airborne!
+        
         HideAllSprites();
         
         if (spriteToShow != null) spriteToShow.SetActive(true);
@@ -327,7 +360,7 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        Invoke("ResetToGrounded", 0.3f); 
+        Invoke("EndAttack", 0.3f); 
     }
 
     // NEW: Handles taking damage and flying backward
@@ -394,6 +427,8 @@ public class PlayerController : MonoBehaviour
         // Snap position back to perfectly center in case they were shaking
         transform.position = new Vector3(rb.position.x, rb.position.y, transform.position.z);
         
+        currentState = State.Grounded;
+        
         // Calculate the damage multiplier (Mathf.Lerp smoothly scales from 1.0 to 1.4 over 1 second)
         float chargePercent = Mathf.Clamp01(chargeTimer / maxChargeTime);
         float finalDamage = pendingDamage * Mathf.Lerp(1f, maxChargeMultiplier, chargePercent);
@@ -409,7 +444,7 @@ public class PlayerController : MonoBehaviour
         currentState = State.Dodging; 
         shieldBubble.SetActive(false); 
         velocity = Vector2.zero;
-        Invoke("ResetToGrounded", 0.4f); 
+        Invoke("EndDodge", 0.4f);
     }
 
     private void ExecuteRoll() 
@@ -422,7 +457,7 @@ public class PlayerController : MonoBehaviour
         
         velocity = new Vector2(dirX * stats.runSpeed * 1.5f, 0); 
         
-        Invoke("ResetToGrounded", 0.5f); 
+        Invoke("EndDodge", 0.5f);
     }
 
     private void ExecuteAirDodge(int dirX, int dirY)
@@ -453,12 +488,12 @@ public class PlayerController : MonoBehaviour
     
     private void HideAllSprites()
     {
-        if(boxingGloveSprite) boxingGloveSprite.SetActive(false);
-        if(hammerSprite) hammerSprite.SetActive(false);
-        if(spikeHelmetSprite) spikeHelmetSprite.SetActive(false);
-        if(bootSprite) bootSprite.SetActive(false);
-        if(upBoxingGloveSprite) upBoxingGloveSprite.SetActive(false);
-        if(shieldBubble) shieldBubble.SetActive(false);
+        if (boxingGloveSprite != null) boxingGloveSprite.SetActive(false);
+        if (bootSprite != null) bootSprite.SetActive(false);
+        if (upBoxingGloveSprite != null) upBoxingGloveSprite.SetActive(false);
+        if (hammerSprite != null) hammerSprite.SetActive(false);
+        if (spikeHelmetSprite != null) spikeHelmetSprite.SetActive(false);
+        if (backBoxingGloveSprite != null) backBoxingGloveSprite.SetActive(false); 
     }
 
     // --- GROUND COLLISIONS & WAVEDASHING ---
@@ -485,9 +520,15 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    private void EndAttack()
+    {
+        HideAllSprites();
+        isAttacking = false; // Turn off the attack lock, returning input control to the player
+    }
+
     private void OnCollisionExit2D(Collision2D col)
     {
-        if (col.gameObject.CompareTag("Ground") && currentState == State.Grounded) 
+        if (col.gameObject.CompareTag("Ground")) 
         {
             currentState = State.Airborne;
         }
@@ -523,5 +564,13 @@ public class PlayerController : MonoBehaviour
         currentState = State.Airborne; 
         CancelInvoke(); 
         HideAllSprites();
+    }
+
+    private void EndDodge()
+    {
+        HideAllSprites();
+        // If we are falling, we must be in the air. Otherwise, we are on the ground.
+        if (Mathf.Abs(rb.linearVelocity.y) > 0.1f) currentState = State.Airborne;
+        else currentState = State.Grounded;
     }
 }
