@@ -38,6 +38,14 @@ public class PlayerController : MonoBehaviour
 
     public bool isAttacking = false;
     
+    [Header("Shield Stats")]
+    public float maxShieldHealth = 50f;
+    public float currentShieldHealth = 50f;
+    public float shieldDepletionRate = 7f; // How fast it drains while holding
+    public float shieldRegenRate = 5f;     // How fast it heals when not in use
+    private Vector3 originalShieldScale;   // To shrink the bubble visually
+    private float parryWindowEnd = -10f;   // Tracks the 5-frame window
+
     [Header("Assigned Stats")]
     public CharacterStats stats;
 
@@ -75,9 +83,12 @@ public class PlayerController : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         
         // --- NEW PHYSICS SETUP ---
-        rb.bodyType = RigidbodyType2D.Dynamic; // Allows collision with the ground
-        rb.gravityScale = 0f;                  // Turns off Unity's gravity (we use our own!)
-        rb.freezeRotation = true;              // Prevents the squares from tumbling over
+        rb.bodyType = RigidbodyType2D.Dynamic;
+        rb.gravityScale = 0f;                  
+        rb.freezeRotation = true;              
+
+        // NEW: Remember the starting size of the shield
+        if (shieldBubble != null) originalShieldScale = shieldBubble.transform.localScale;
 
         AssignInputsAndStats();
         HideAllSprites();
@@ -184,16 +195,27 @@ public class PlayerController : MonoBehaviour
         bool isWalkModifier = Input.GetKey(walkModKey);
 
         // --- DEFENSE ---
+        // --- DEFENSE ---
         if (Input.GetKey(shieldKey))
         {
-            if (currentState == State.Grounded || currentState == State.Shielding) // FIX: Allow dodging while shielding
+            if (currentState == State.Grounded || currentState == State.Shielding) 
             {
                 if (Input.GetKeyDown(downKey)) { ExecuteSpotDodge(); return; }
                 if (Input.GetKeyDown(leftKey) || Input.GetKeyDown(rightKey)) { ExecuteRoll(); return; }
                 
                 currentState = State.Shielding;
                 shieldBubble.SetActive(true);
-                velocity.x = 0; // FIX: Stop sliding when shield is pulled up
+                velocity.x = 0; 
+
+                // NEW: Drain shield health over time
+                currentShieldHealth -= shieldDepletionRate * Time.deltaTime;
+                UpdateShieldVisual();
+
+                if (currentShieldHealth <= 0)
+                {
+                    TriggerShieldBreak();
+                    return;
+                }
             }
             else if (currentState == State.Airborne && Input.GetKeyDown(shieldKey))
             {
@@ -203,7 +225,21 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            if (currentState == State.Shielding) currentState = State.Grounded;
+            if (currentState == State.Shielding) 
+            {
+                currentState = State.Grounded;
+                shieldBubble.SetActive(false);
+                
+                // NEW: Dropping shield grants exactly 5 frames of Parry Invincibility! 
+                // (5 frames at 60fps = 0.0833 seconds)
+                parryWindowEnd = Time.time + (5f / 60f); 
+            }
+            else if (currentShieldHealth < maxShieldHealth)
+            {
+                // NEW: Heal the shield when not in use
+                currentShieldHealth += shieldRegenRate * Time.deltaTime;
+                if (currentShieldHealth > maxShieldHealth) currentShieldHealth = maxShieldHealth;
+            }
             shieldBubble.SetActive(false);
         }
 
@@ -296,35 +332,48 @@ public class PlayerController : MonoBehaviour
     // --- COMBAT LOGIC ---
     private void DetermineGroundAttack(int xInput, bool isWalkMod)
     {
-        bool smashInput = (Input.GetKeyDown(leftKey) || Input.GetKeyDown(rightKey)) && Input.GetKeyDown(attackKey);
-        
+        // DOWN ATTACKS
         if (Input.GetKey(downKey))
         {
-            if (Input.GetKeyDown(attackKey)) 
+            // If we tapped down recently, it's a Smash!
+            if (Time.time - lastDownPress <= smashWindow)
             {
-                // If the time between tapping Down and pressing Attack is less than 0.2s, it's a Smash!
-                if (Time.time - lastDownPress <= smashWindow)
-                    StartChargeSmash("DownSmash", boxingGloveSprite, 25f, backBoxingGloveSprite);
-                else 
-                    ExecuteAttack("DownTilt", bootSprite, 7f);
+                StartChargeSmash("DownSmash", boxingGloveSprite, 25f, backBoxingGloveSprite);
+            }
+            else 
+            {
+                ExecuteAttack("DownTilt", bootSprite, 7f);
             }
         }        
+        // UP ATTACKS
         else if (Input.GetKey(upKey))
         {
-            if (Input.GetKeyDown(attackKey)) 
+            if (Time.time - lastUpPress <= smashWindow)
             {
-                if (Time.time - lastUpPress <= smashWindow)
-                    StartChargeSmash("UpSmash", upBoxingGloveSprite, 20f);
-                else 
-                    ExecuteAttack("UpTilt", spikeHelmetSprite, 8f);
+                StartChargeSmash("UpSmash", upBoxingGloveSprite, 20f);
+            }
+            else 
+            {
+                ExecuteAttack("UpTilt", spikeHelmetSprite, 8f);
             }
         }
+        // FORWARD/SIDE ATTACKS
         else if (xInput != 0)
         {
-            if (smashInput) if (Time.time - lastSidePress <= smashWindow) StartChargeSmash("ForwardSmash", hammerSprite, 30f);
-            else if (Mathf.Abs(velocity.x) > stats.walkSpeed && !isWalkMod) ExecuteAttack("DashAttack", boxingGloveSprite, 9f);
-            else ExecuteAttack("ForwardTilt", hammerSprite, 8f);
+            if (Time.time - lastSidePress <= smashWindow) 
+            {
+                StartChargeSmash("ForwardSmash", hammerSprite, 30f);
+            }
+            else if (Mathf.Abs(velocity.x) > stats.walkSpeed && !isWalkMod) 
+            {
+                ExecuteAttack("DashAttack", boxingGloveSprite, 9f);
+            }
+            else 
+            {
+                ExecuteAttack("ForwardTilt", hammerSprite, 8f);
+            }
         }
+        // NEUTRAL ATTACKS
         else
         {
             ExecuteJab();
@@ -367,20 +416,33 @@ public class PlayerController : MonoBehaviour
     public void TakeHit(float incomingDamage, Vector2 knockbackDir)
     {
         if (currentState == State.Dodging) return; 
-        
+
+        // --- NEW: PARRY CHECK ---
+        if (Time.time <= parryWindowEnd)
+        {
+            Debug.Log($"** PARRY! ** {playerType} perfectly deflected the attack!");
+            // A parry takes 0 damage, 0 knockback, and ignores the hit completely.
+            return; 
+        }
+
+        // --- NEW: SHIELD CHECK ---
+        if (currentState == State.Shielding)
+        {
+            currentShieldHealth -= incomingDamage;
+            UpdateShieldVisual();
+            
+            if (currentShieldHealth <= 0) TriggerShieldBreak();
+            
+            // We blocked the hit, so we don't take physical damage or knockback
+            return; 
+        }
+
         currentState = State.Hitstun;
         HideAllSprites();
         
-        // Accumulate damage!
         currentDamage += incomingDamage;
+        if (damageUI != null) damageUI.text = Mathf.FloorToInt(currentDamage).ToString() + "%";
         
-        // --- NEW: UPDATE THE UI ---
-        if (damageUI != null) 
-        {
-            damageUI.text = Mathf.FloorToInt(currentDamage).ToString() + "%";
-        }
-        
-        // Knockback Math
         float knockbackForce = (currentDamage * incomingDamage) / stats.weight; 
         knockbackForce = Mathf.Clamp(knockbackForce, 5f, 100f); 
         
@@ -526,6 +588,31 @@ public class PlayerController : MonoBehaviour
         isAttacking = false; // Turn off the attack lock, returning input control to the player
     }
 
+    private void UpdateShieldVisual()
+    {
+        if (shieldBubble != null && maxShieldHealth > 0)
+        {
+            // Shrink the bubble based on health percentage, but don't let it get smaller than 20%
+            float scalePercent = Mathf.Clamp(currentShieldHealth / maxShieldHealth, 0.2f, 1f);
+            shieldBubble.transform.localScale = originalShieldScale * scalePercent;
+        }
+    }
+
+    private void TriggerShieldBreak()
+    {
+        Debug.Log($"SHIELD BREAK! {playerType} is blasting off again!");
+        
+        currentState = State.Hitstun;
+        shieldBubble.SetActive(false);
+        
+        // Launch them straight up into the sky/blast zone
+        velocity = new Vector2(0, stats.jumpHeight * 2f); 
+        rb.linearVelocity = velocity; 
+
+        // Reset the shield so they have it when they respawn
+        currentShieldHealth = maxShieldHealth; 
+    }
+
     private void OnCollisionExit2D(Collision2D col)
     {
         if (col.gameObject.CompareTag("Ground")) 
@@ -564,6 +651,7 @@ public class PlayerController : MonoBehaviour
         currentState = State.Airborne; 
         CancelInvoke(); 
         HideAllSprites();
+        currentShieldHealth = maxShieldHealth;
     }
 
     private void EndDodge()
