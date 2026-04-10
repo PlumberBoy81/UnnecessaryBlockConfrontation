@@ -19,6 +19,7 @@ public class PlayerController : MonoBehaviour
     public GameObject spikeHelmetSprite;
     public GameObject bootSprite;
     public GameObject upBoxingGloveSprite;
+    public GameObject downBoxingGloveSprite;
     public GameObject shieldBubble;
 
     // --- Physics Stats ---
@@ -31,10 +32,13 @@ public class PlayerController : MonoBehaviour
         public float jumpHeight, shortHopHeight, doubleJumpHeight;
     }
 
+    [Header("Facing Direction")]
+    public bool isFacingRight = true;
+
     [Header("Current Status")]
     public float currentDamage = 0f; 
     public Vector3 respawnPoint = new Vector3(0, 5, 0); 
-    public TextMeshProUGUI damageUI; // NEW: The text element on the screen
+    public TextMeshProUGUI damageUI; 
 
     public bool isAttacking = false;
     
@@ -87,7 +91,6 @@ public class PlayerController : MonoBehaviour
         rb.gravityScale = 0f;                  
         rb.freezeRotation = true;              
 
-        // NEW: Remember the starting size of the shield
         if (shieldBubble != null) originalShieldScale = shieldBubble.transform.localScale;
 
         AssignInputsAndStats();
@@ -146,6 +149,12 @@ public class PlayerController : MonoBehaviour
 
     private void HandleInputs()
     {
+        if (currentState == State.Grounded || currentState == State.Airborne)
+        {
+            if (xInput > 0) isFacingRight = true;
+            else if (xInput < 0) isFacingRight = false;
+        }
+
         // --- CHARGE SMASH INTERCEPT ---
         if (currentState == State.ChargingSmash)
         {
@@ -186,15 +195,13 @@ public class PlayerController : MonoBehaviour
                 velocity.x = Mathf.MoveTowards(velocity.x, 0, 40f * Time.deltaTime); 
                 rb.linearVelocity = new Vector2(velocity.x, rb.linearVelocity.y); 
             }
-            
-            // 3. Return early so they can't input new jumps or direction changes
+
             return; 
         }
         
         int xInput = (Input.GetKey(rightKey) ? 1 : 0) - (Input.GetKey(leftKey) ? 1 : 0);
         bool isWalkModifier = Input.GetKey(walkModKey);
 
-        // --- DEFENSE ---
         // --- DEFENSE ---
         if (Input.GetKey(shieldKey))
         {
@@ -207,7 +214,6 @@ public class PlayerController : MonoBehaviour
                 shieldBubble.SetActive(true);
                 velocity.x = 0; 
 
-                // NEW: Drain shield health over time
                 currentShieldHealth -= shieldDepletionRate * Time.deltaTime;
                 UpdateShieldVisual();
 
@@ -230,13 +236,10 @@ public class PlayerController : MonoBehaviour
                 currentState = State.Grounded;
                 shieldBubble.SetActive(false);
                 
-                // NEW: Dropping shield grants exactly 5 frames of Parry Invincibility! 
-                // (5 frames at 60fps = 0.0833 seconds)
                 parryWindowEnd = Time.time + (5f / 60f); 
             }
             else if (currentShieldHealth < maxShieldHealth)
             {
-                // NEW: Heal the shield when not in use
                 currentShieldHealth += shieldRegenRate * Time.deltaTime;
                 if (currentShieldHealth > maxShieldHealth) currentShieldHealth = maxShieldHealth;
             }
@@ -244,17 +247,25 @@ public class PlayerController : MonoBehaviour
         }
 
         // --- ATTACKS ---
-        if (Input.GetKeyDown(attackKey) && currentState == State.Grounded)
+        if (Input.GetKeyDown(attackKey))
         {
-            DetermineGroundAttack(xInput, isWalkModifier);
-            return;
+            if (currentState == State.Grounded)
+            {
+                DetermineGroundAttack(xInput, isWalkModifier);
+                return;
+            }
+            else if (currentState == State.Airborne)
+            {
+                DetermineAerialAttack(xInput);
+                return;
+            }
         }
 
         // --- MOVEMENT & JUMPING ---
         if (Input.GetKeyDown(upKey))
         {
             if (currentState == State.Grounded || currentState == State.Shielding) StartJumpsquat();
-            else if (currentState == State.Airborne && jumpsRemaining > 0) ExecuteJump(stats.doubleJumpHeight, true); // FIX: Flag as double jump
+            else if (currentState == State.Airborne && jumpsRemaining > 0) ExecuteJump(stats.doubleJumpHeight, true); 
         }
 
         if (currentState == State.Airborne && Input.GetKeyDown(downKey) && velocity.y < 0)
@@ -312,11 +323,8 @@ public class PlayerController : MonoBehaviour
     // --- JUMP LOGIC ---
     private void StartJumpsquat()
     {
-        float height = Input.GetKey(upKey) ? stats.jumpHeight : stats.shortHopHeight;
-        
-        // FIX: Cap horizontal momentum to air speed when leaving the ground
-        velocity.x = Mathf.Clamp(velocity.x, -stats.airSpeed, stats.airSpeed); 
-        
+        float height = Input.GetKey(upKey) ? stats.jumpHeight : stats.shortHopHeight; 
+        velocity.x = Mathf.Clamp(velocity.x, -stats.airSpeed, stats.airSpeed);         
         ExecuteJump(height, false);
     }
 
@@ -324,8 +332,6 @@ public class PlayerController : MonoBehaviour
     {
         currentState = State.Airborne;
         velocity.y = Mathf.Sqrt(2f * stats.gravity * height); 
-        
-        // FIX: Only consume a jump if we are actually double jumping
         if (isDoubleJump) jumpsRemaining--; 
     }
 
@@ -380,11 +386,48 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    private void DetermineAerialAttack(int xInput)
+    {
+        // --- DOWN AIR ---
+        if (Input.GetKey(downKey))
+        {
+            StartChargeSmash("DownAir", downBoxingGloveSprite, 13f);
+            return;
+        }
+        // --- UP AIR ---
+        else if (Input.GetKey(upKey))
+        {
+            ExecuteAttack("UpAir", upBoxingGloveSprite, 7f);
+            return;
+        }
+        // --- NEUTRAL AIR ---
+        else if (xInput == 0)
+        {
+            ExecuteAttack("NeutralAir", boxingGloveSprite, 8f);
+            return;
+        }
+        // --- FORWARD AIR / BACK AIR ---
+        else if (xInput != 0)
+        {
+            bool isHoldingForward = (xInput > 0 && isFacingRight) || (xInput < 0 && !isFacingRight);
+
+            if (isHoldingForward)
+            {
+                StartChargeSmash("ForwardAir", hammerSprite, 13f);
+            }
+            else
+            {
+                StartChargeSmash("BackAir", hammerSprite, 13f);
+            }
+            return;
+        }
+    }
+
     private void ExecuteAttack(string attackName, GameObject spriteToShow, float damage, GameObject secondarySprite = null)
     {
         Debug.Log($"{playerType} performed {attackName} dealing {damage}% damage!");
         
-        isAttacking = true; // CHANGED: We are now attacking, but we remain Grounded or Airborne!
+        isAttacking = true;
         
         HideAllSprites();
         
@@ -401,23 +444,35 @@ public class PlayerController : MonoBehaviour
             // If we found a player, and it's NOT us...
             if (enemyPlayer != null && enemyPlayer != this)
             {
-                // Calculate knockback direction (away from attacker)
                 Vector2 knockbackDir = (enemyPlayer.transform.position - transform.position).normalized;
-                knockbackDir.y += 0.5f; // Add an upward angle to the hit
                 
-                enemyPlayer.TakeHit(damage, knockbackDir);
+                // --- METEOR SMASH OVERRIDE ---
+                if (isMeteor && enemyPlayer.currentState == State.Airborne)
+                {
+                    knockbackDir = Vector2.down; // Spike them straight down!
+                }
+                // --- NEW: UP AIR JUGGLE OVERRIDE ---
+                else if (attackName == "UpAir")
+                {
+                    knockbackDir = Vector2.up; // Pure vertical knockback for combos!
+                }
+                // --- STANDARD KNOCKBACK ---
+                else
+                {
+                    knockbackDir.y += 0.5f; // Standard outward/upward angle
+                }
+                
+                enemyPlayer.TakeHit(damage, knockbackDir, isInstaKill);
             }
         }
 
         Invoke("EndAttack", 0.3f); 
     }
 
-    // NEW: Handles taking damage and flying backward
     public void TakeHit(float incomingDamage, Vector2 knockbackDir)
     {
         if (currentState == State.Dodging) return; 
 
-        // --- NEW: PARRY CHECK ---
         if (Time.time <= parryWindowEnd)
         {
             Debug.Log($"** PARRY! ** {playerType} perfectly deflected the attack!");
@@ -425,7 +480,6 @@ public class PlayerController : MonoBehaviour
             return; 
         }
 
-        // --- NEW: SHIELD CHECK ---
         if (currentState == State.Shielding)
         {
             currentShieldHealth -= incomingDamage;
@@ -433,7 +487,6 @@ public class PlayerController : MonoBehaviour
             
             if (currentShieldHealth <= 0) TriggerShieldBreak();
             
-            // We blocked the hit, so we don't take physical damage or knockback
             return; 
         }
 
@@ -445,6 +498,13 @@ public class PlayerController : MonoBehaviour
         
         float knockbackForce = (currentDamage * incomingDamage) / stats.weight; 
         knockbackForce = Mathf.Clamp(knockbackForce, 5f, 100f); 
+
+        if (isInstaKill)
+        {
+            Debug.Log("INSTAKILL METEOR SMASH!");
+            knockbackForce = 100f; // Max out the speed
+            knockbackDir = Vector2.down; // Guarantee downward trajectory
+        }
         
         velocity = knockbackDir.normalized * knockbackForce * 0.2f; 
         
@@ -486,17 +546,28 @@ public class PlayerController : MonoBehaviour
 
     private void ReleaseSmash()
     {
-        // Snap position back to perfectly center in case they were shaking
         transform.position = new Vector3(rb.position.x, rb.position.y, transform.position.z);
+        currentState = State.Grounded; 
         
-        currentState = State.Grounded;
-        
-        // Calculate the damage multiplier (Mathf.Lerp smoothly scales from 1.0 to 1.4 over 1 second)
         float chargePercent = Mathf.Clamp01(chargeTimer / maxChargeTime);
-        float finalDamage = pendingDamage * Mathf.Lerp(1f, maxChargeMultiplier, chargePercent);
         
-        // Execute the attack with the newly scaled damage!
-        ExecuteAttack(pendingAttackName, pendingSprite, finalDamage, pendingSecondarySprite);
+        // Default Smash Math
+        float finalDamage = pendingDamage * Mathf.Lerp(1f, maxChargeMultiplier, chargePercent);
+        bool isMeteor = false;
+        bool isInstaKill = false;
+
+        if (pendingAttackName == "ForwardAir" || pendingAttackName == "BackAir" || pendingAttackName == "DownAir")
+        {
+            // Scale from 1.0x to 3.0x damage (13 -> 39)
+            finalDamage = pendingDamage * Mathf.Lerp(1f, 3f, chargePercent);
+            isMeteor = true; // Always spikes!
+            
+            // If held for the full 1 second, flag the instakill
+            if (chargePercent >= 1f) isInstaKill = true; 
+        }
+        
+        // Pass our new flags into ExecuteAttack
+        ExecuteAttack(pendingAttackName, pendingSprite, finalDamage, pendingSecondarySprite, isMeteor, isInstaKill);
     }
 
     // --- DEFENSIVE MOVES ---
@@ -527,7 +598,6 @@ public class PlayerController : MonoBehaviour
         currentState = State.Dodging;
         shieldBubble.SetActive(false); // Make sure shield bubble isn't showing in air
 
-        // FIX: Halt current momentum so they don't float into the stratosphere
         velocity = Vector2.zero; 
 
         // Apply a burst of momentum for directional air dodges
@@ -606,7 +676,7 @@ public class PlayerController : MonoBehaviour
         shieldBubble.SetActive(false);
         
         // Launch them straight up into the sky/blast zone
-        velocity = new Vector2(0, stats.jumpHeight * 2f); 
+        velocity = new Vector2(0, stats.jumpHeight * 1f); 
         rb.linearVelocity = velocity; 
 
         // Reset the shield so they have it when they respawn
@@ -636,7 +706,6 @@ public class PlayerController : MonoBehaviour
         // Reset stats
         currentDamage = 0f;
         
-        // --- NEW: RESET THE UI ---
         if (damageUI != null) 
         {
             damageUI.text = "0%";
