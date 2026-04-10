@@ -971,10 +971,17 @@ MonoBehaviour:
   spikeHelmetSprite: {fileID: 46191316}
   bootSprite: {fileID: 10916886}
   upBoxingGloveSprite: {fileID: 2012531246}
+  downBoxingGloveSprite: {fileID: 0}
   shieldBubble: {fileID: 540137337}
+  isFacingRight: 1
   currentDamage: 0
-  respawnPoint: {x: 2.5, y: -0.65, z: 0}
+  respawnPoint: {x: 2.5, y: 5.5, z: 0}
   damageUI: {fileID: 738939344}
+  isAttacking: 0
+  maxShieldHealth: 50
+  currentShieldHealth: 50
+  shieldDepletionRate: 7
+  shieldRegenRate: 5
   stats:
     weight: 0
     initialDash: 0
@@ -3102,10 +3109,17 @@ MonoBehaviour:
   spikeHelmetSprite: {fileID: 2093908229}
   bootSprite: {fileID: 1400525844}
   upBoxingGloveSprite: {fileID: 1009331830}
+  downBoxingGloveSprite: {fileID: 0}
   shieldBubble: {fileID: 1248143123}
+  isFacingRight: 1
   currentDamage: 0
-  respawnPoint: {x: -2.5, y: -0.65, z: 0}
+  respawnPoint: {x: -2.5, y: 5.5, z: 0}
   damageUI: {fileID: 876691810}
+  isAttacking: 0
+  maxShieldHealth: 50
+  currentShieldHealth: 50
+  shieldDepletionRate: 7
+  shieldRegenRate: 5
   stats:
     weight: 0
     initialDash: 0

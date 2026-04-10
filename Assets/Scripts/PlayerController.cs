@@ -149,11 +149,19 @@ public class PlayerController : MonoBehaviour
 
     private void HandleInputs()
     {
+        // 1. Declare this at the ABSOLUTE TOP, not inside any { } blocks
+        int xInput = (Input.GetKey(rightKey) ? 1 : 0) - (Input.GetKey(leftKey) ? 1 : 0);
+
+        // 2. Track facing direction
         if (currentState == State.Grounded || currentState == State.Airborne)
         {
             if (xInput > 0) isFacingRight = true;
             else if (xInput < 0) isFacingRight = false;
         }
+
+        // 3. Your attack lock and other early returns
+        if (isAttacking) return; 
+        if (currentState == State.Hitstun) return;
 
         // --- CHARGE SMASH INTERCEPT ---
         if (currentState == State.ChargingSmash)
@@ -199,7 +207,7 @@ public class PlayerController : MonoBehaviour
             return; 
         }
         
-        int xInput = (Input.GetKey(rightKey) ? 1 : 0) - (Input.GetKey(leftKey) ? 1 : 0);
+        xInput = (Input.GetKey(rightKey) ? 1 : 0) - (Input.GetKey(leftKey) ? 1 : 0);
         bool isWalkModifier = Input.GetKey(walkModKey);
 
         // --- DEFENSE ---
@@ -423,7 +431,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void ExecuteAttack(string attackName, GameObject spriteToShow, float damage, GameObject secondarySprite = null)
+    private void ExecuteAttack(string attackName, GameObject spriteToShow, float damage, GameObject secondarySprite = null, bool isMeteor = false, bool isInstaKill = false)
     {
         Debug.Log($"{playerType} performed {attackName} dealing {damage}% damage!");
         
@@ -469,7 +477,7 @@ public class PlayerController : MonoBehaviour
         Invoke("EndAttack", 0.3f); 
     }
 
-    public void TakeHit(float incomingDamage, Vector2 knockbackDir)
+    public void TakeHit(float incomingDamage, Vector2 knockbackDir, bool isInstaKill = false)
     {
         if (currentState == State.Dodging) return; 
 
@@ -547,7 +555,14 @@ public class PlayerController : MonoBehaviour
     private void ReleaseSmash()
     {
         transform.position = new Vector3(rb.position.x, rb.position.y, transform.position.z);
-        currentState = State.Grounded; 
+        if (pendingAttackName == "ForwardAir" || pendingAttackName == "BackAir" || pendingAttackName == "DownAir")
+        {
+            currentState = State.Airborne;
+        }
+        else
+        {
+            currentState = State.Grounded; 
+        } 
         
         float chargePercent = Mathf.Clamp01(chargeTimer / maxChargeTime);
         
