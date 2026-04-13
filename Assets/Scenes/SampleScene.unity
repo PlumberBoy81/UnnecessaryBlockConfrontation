@@ -982,6 +982,9 @@ MonoBehaviour:
   currentShieldHealth: 50
   shieldDepletionRate: 7
   shieldRegenRate: 5
+  wallBounceDamage: 5
+  techWindowFrames: 10
+  techVelocityThreshold: 15
   stats:
     weight: 0
     initialDash: 0
@@ -3120,6 +3123,9 @@ MonoBehaviour:
   currentShieldHealth: 50
   shieldDepletionRate: 7
   shieldRegenRate: 5
+  wallBounceDamage: 5
+  techWindowFrames: 10
+  techVelocityThreshold: 15
   stats:
     weight: 0
     initialDash: 0
