@@ -41,6 +41,15 @@ public class PlayerController : MonoBehaviour
     public TextMeshProUGUI damageUI; 
 
     public bool isAttacking = false;
+
+    [Header("Special Attacks")]
+    public KeyCode specialKey;
+    public GameObject fireballPrefab; // Drag Red's fireball prefab here
+    public GameObject spinSprite;     // Drag Blue's spin sprite here
+    public Transform shootPoint;      // An empty GameObject in front of the player
+    
+    [HideInInspector]
+    public bool isReflecting = false; // Tells projectiles if they should bounce back
     
     [Header("Shield Stats")]
     public float maxShieldHealth = 50f;
@@ -280,6 +289,16 @@ public class PlayerController : MonoBehaviour
             }
         }
 
+        // --- SPECIAL ATTACKS ---
+        if (Input.GetKeyDown(specialKey))
+        {
+            if (currentState == State.Grounded || currentState == State.Airborne)
+            {
+                DetermineSpecialAttack(xInput);
+                return;
+            }
+        }
+
         // --- MOVEMENT & JUMPING ---
         if (Input.GetKeyDown(upKey))
         {
@@ -440,6 +459,47 @@ public class PlayerController : MonoBehaviour
             }
             return;
         }
+    }
+
+    private void DetermineSpecialAttack(int xInput)
+    {
+        // NEUTRAL SPECIAL (No directional keys held)
+        if (xInput == 0 && !Input.GetKey(upKey) && !Input.GetKey(downKey))
+        {
+            if (playerType == "Red") // Or however your strings are named!
+            {
+                // Red throws a fireball. The attack itself does 0 damage, the projectile does the work.
+                ExecuteAttack("FireballThrow", boxingGloveSprite, 0f); 
+                SpawnFireball();
+            }
+            else 
+            {
+                // Blue spins! 15% damage and acts as a reflector.
+                isReflecting = true; 
+                ExecuteAttack("SpinAttack", spinSprite, 15f);
+                
+                // Turn off the reflect hitbox after the attack finishes (roughly 0.3 seconds)
+                Invoke("ResetReflect", 0.3f); 
+            }
+            return;
+        }
+    }
+
+    private void SpawnFireball()
+    {
+        if (fireballPrefab != null && shootPoint != null)
+        {
+            GameObject fireball = Instantiate(fireballPrefab, shootPoint.position, Quaternion.identity);
+            FireballScript fbScript = fireball.GetComponent<FireballScript>();
+            
+            // Tell the fireball which way to fly based on Red's facing direction
+            if (fbScript != null) fbScript.Initialize(isFacingRight, this);
+        }
+    }
+
+    private void ResetReflect()
+    {
+        isReflecting = false;
     }
 
     private void ExecuteAttack(string attackName, GameObject spriteToShow, float damage, GameObject secondarySprite = null, bool isMeteor = false, bool isInstaKill = false)
