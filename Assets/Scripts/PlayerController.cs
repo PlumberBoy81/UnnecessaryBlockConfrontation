@@ -41,7 +41,7 @@ public class PlayerController : MonoBehaviour
     public TextMeshProUGUI damageUI; 
 
     public bool isAttacking = false;
-
+    
     [Header("Special Attacks")]
     public KeyCode specialKey;
     public GameObject fireballPrefab; // Drag Red's fireball prefab here
@@ -58,12 +58,6 @@ public class PlayerController : MonoBehaviour
     public float shieldRegenRate = 5f;     // How fast it heals when not in use
     private Vector3 originalShieldScale;   // To shrink the bubble visually
     private float parryWindowEnd = -10f;   // Tracks the 5-frame window
-
-    [Header("Tech & Wall Stats")]
-    private float lastShieldPressTime = -10f; 
-    public float wallBounceDamage = 5f; 
-    public float techWindowFrames = 10f; // 10 frames of leniency
-    public float techVelocityThreshold = 15f; // How fast you must be flying to bounce
 
     [Header("Assigned Stats")]
     public CharacterStats stats;
@@ -226,11 +220,6 @@ public class PlayerController : MonoBehaviour
         bool isWalkModifier = Input.GetKey(walkModKey);
 
         // --- DEFENSE ---
-        if (Input.GetKeyDown(shieldKey))
-        {
-            lastShieldPressTime = Time.time;
-        }
-
         if (Input.GetKey(shieldKey))
         {
             if (currentState == State.Grounded || currentState == State.Shielding) 
@@ -288,7 +277,6 @@ public class PlayerController : MonoBehaviour
                 return;
             }
         }
-
         // --- SPECIAL ATTACKS ---
         if (Input.GetKeyDown(specialKey))
         {
@@ -466,7 +454,7 @@ public class PlayerController : MonoBehaviour
         // NEUTRAL SPECIAL (No directional keys held)
         if (xInput == 0 && !Input.GetKey(upKey) && !Input.GetKey(downKey))
         {
-            if (playerType == "Red") // Or however your strings are named!
+            if (playerType == PlayerID.Player1_Red) // Or however your strings are named!
             {
                 // Red throws a fireball. The attack itself does 0 damage, the projectile does the work.
                 ExecuteAttack("FireballThrow", boxingGloveSprite, 0f); 
@@ -715,15 +703,8 @@ public class PlayerController : MonoBehaviour
     }
 
     // --- GROUND COLLISIONS & WAVEDASHING ---
-    void OnCollisionEnter2D(Collision2D col)
+    private void OnCollisionEnter2D(Collision2D col)
     {
-        // Check for Wall (Must have both Tag and Layer)
-        if (col.gameObject.CompareTag("Wall") && col.gameObject.layer == LayerMask.NameToLayer("Wall"))
-        {
-            HandleWallCollision();
-            return;
-        }
-
         if (col.gameObject.CompareTag("Ground")) 
         {
             if (currentState == State.Dodging && velocity.y < 0)
@@ -743,54 +724,6 @@ public class PlayerController : MonoBehaviour
             CancelInvoke("ResetAirborne");
             CancelInvoke("ResetToGrounded");
         }
-    }
-
-    private void HandleWallCollision()
-    {
-        // Only bounce/tech if the player was actively launched (Hitstun)
-        if (currentState != State.Hitstun) return;
-
-        // If they aren't flying fast enough, ignore the bounce
-        if (velocity.magnitude < techVelocityThreshold) return;
-
-        // Calculate the tech window (10 frames at 60fps)
-        float techWindowSeconds = techWindowFrames / 60f;
-
-        // --- CHECK FOR WALL TECH ---
-        if (Time.time - lastShieldPressTime <= techWindowSeconds)
-        {
-            Debug.Log($"** WALL TECH! ** {playerType} absorbed the impact!");
-            
-            // Tech succeeds: Stop all momentum, take 0 damage, return to Airborne state
-            velocity = Vector2.zero;
-            rb.linearVelocity = Vector2.zero;
-            currentState = State.Airborne; 
-            
-            return;
-        }
-
-        // --- TECH FAILED (WALL BOUNCE / STAGE SPIKE) ---
-        
-        // Take the small wall damage
-        currentDamage += wallBounceDamage;
-        if (damageUI != null) damageUI.text = Mathf.FloorToInt(currentDamage).ToString() + "%";
-
-        // Check if the launch angle was downward (Stage Spike!)
-        if (velocity.y < -5f)
-        {
-            Debug.Log($"STAGE SPIKE! {playerType} is doomed!");
-            // Reverse X velocity (bounce off wall), multiply Y velocity (spike down harder)
-            velocity = new Vector2(-velocity.x * 0.8f, velocity.y * 1.3f);
-        }
-        else
-        {
-            Debug.Log("Wall Bounce!");
-            // Standard bounce: Reverse X, dampen overall momentum
-            velocity = new Vector2(-velocity.x * 0.5f, velocity.y * 0.8f);
-        }
-
-        // Apply the new physics trajectory
-        rb.linearVelocity = velocity;
     }
 
     private void EndAttack()
