@@ -45,30 +45,30 @@ public class PlayerController : MonoBehaviour
     
     [Header("Neutral Special Stats")]
     public KeyCode specialKey;
-    public GameObject fireballPrefab; // Drag Red's fireball prefab here
-    public GameObject spinSprite;     // Drag Blue's spin sprite here
-    public Transform shootPoint;      // An empty GameObject in front of the player
+    public GameObject fireballPrefab; 
+    public GameObject spinSprite;    
+    public Transform shootPoint;      
 
     [Header("Side Special Stats")]
-    public GameObject redSideSpecialSprite;   // Drag Red's heavy punch sprite here
-    public GameObject blueSideSpecialSprite;  // Drag Blue's dash sprite here
-    public float blueDashSpeed = 30f;         // Fast lightspeed burst
-    public float redLungeSpeed = 12f;         // Slower, heavy forward momentum
+    public GameObject redSideSpecialSprite;  
+    public GameObject blueSideSpecialSprite; 
+    public float blueDashSpeed = 30f;         
+    public float redLungeSpeed = 12f;         
 
     [Header("Up Special Stats")]
-    public float redUpSpecialPower = 18f; // High vertical launch
-    public float blueUpSpecialPower = 25f; // Very fast vertical dash
-    public GameObject redUpSpecialSprite; // Your "Super Jump Punch" sprite
+    public float redUpSpecialPower = 18f; 
+    public float blueUpSpecialPower = 25f; 
+    public GameObject redUpSpecialSprite; 
 
     [Header("Down Special Stats")]
-    public GameObject redReflectorSprite; // Drag Red's shiny reflector here
+    public GameObject redReflectorSprite; 
     public float blueBaseSpinSpeed = 15f; // The minimum speed of the dash
     public int maxSpinCharge = 6;         // How many mashes until it auto-fires    
     private int currentSpinCharge = 0;
     private bool isChargingSpin = false;
 
     [Header("Spin Settings")]
-    public float spinRotationSpeed = 1500f; // Extremely fast rotation!
+    public float spinRotationSpeed = 1500f;
     private bool isSpinning = false;
     
     [HideInInspector]
@@ -96,7 +96,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("Smash Charge Settings")]
     public float maxChargeTime = 1f; // 60 frames (1 second)
-    public float maxChargeMultiplier = 1.4f; // Smash standard: 1.4x damage at max charge
+    public float maxChargeMultiplier = 1.4f; 
 
     // Internal physics variables
     private Rigidbody2D rb;
@@ -117,8 +117,7 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
-        
-        // --- NEW PHYSICS SETUP ---
+
         rb.bodyType = RigidbodyType2D.Dynamic;
         rb.gravityScale = 0f;                  
         rb.freezeRotation = true;              
@@ -134,7 +133,6 @@ public class PlayerController : MonoBehaviour
     {
         if (isSpinning)
         {
-            // Rotates the character around the Z-axis (2D space)
             transform.Rotate(0f, 0f, spinRotationSpeed * Time.deltaTime);
         }
 
@@ -143,7 +141,6 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
-        // ADDED Hitstun so players fall in an arc when knocked back!
         if (currentState == State.Grounded || currentState == State.Airborne || currentState == State.Hitstun)
         {
             ApplyPhysics();
@@ -191,26 +188,22 @@ public class PlayerController : MonoBehaviour
         // --- HELPLESS STATE CHECK ---
         if (currentState == State.Helpless)
         {
-            return; // ApplyPhysics() already handles drifting natively, so we just stop reading other inputs here!
+            return; 
         }
 
-        // --- NEW: BLUE SPIN CHARGE MASHING ---
         if (isChargingSpin)
         {
-            // Keep Blue horizontally still while charging, but let gravity pull him normally
             rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
 
-            // Listen for the Special Key mash!
             if (Input.GetKeyDown(specialKey))
             {
                 currentSpinCharge++;
             }
 
-            // Launch forward if they fully charge it OR if they release the Down key!
             if (currentSpinCharge >= maxSpinCharge || !Input.GetKey(downKey))
             {
                 isChargingSpin = false;
-                isSpinning = true; // NEW: Spin while dashing!
+                isSpinning = true; 
                 
                 ExecuteAttack("DownSpecialBlue", boxingGloveSprite, 12f);
                 
@@ -220,12 +213,12 @@ public class PlayerController : MonoBehaviour
                 rb.linearVelocity = new Vector2(moveDir * finalDashSpeed, 0f);
                 currentSpinCharge = 0; 
                 
-                Invoke("ResetReflect", 0.4f); // Turn off the spin when the dash finishes
+                Invoke("ResetReflect", 0.4f); 
             }
-            return; // Stop reading other inputs until the charge is finished!
+            return; 
         }
 
-        xInput = (Input.GetKey(rightKey) ? 1 : 0) - (Input.GetKey(leftKey) ? 1 : 0); // DELETE "int " here
+        xInput = (Input.GetKey(rightKey) ? 1 : 0) - (Input.GetKey(leftKey) ? 1 : 0); 
 
         if (currentState == State.Grounded || currentState == State.Airborne)
         {
@@ -508,18 +501,15 @@ private void DetermineSpecialAttack(int xInput)
         {
             if (playerType == PlayerID.Player1_Red)
             {
-                // Red: Super Jump Punch (25% damage, moderate knockback)
                 ExecuteAttack("UpSpecialRed", redUpSpecialSprite, 25f);
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x * 0.5f, redUpSpecialPower);
             }
             else
             {
-                // Blue: Vertical Lightspeed Dash (High speed, 5% damage)
                 ExecuteAttack("UpSpecialBlue", blueSideSpecialSprite, 5f);
                 rb.linearVelocity = new Vector2(0f, blueUpSpecialPower);
             }
 
-            // Immediately enter Helpless state after the move starts
             currentState = State.Helpless;
             return;
         }
@@ -529,22 +519,16 @@ private void DetermineSpecialAttack(int xInput)
         {
             if (playerType == PlayerID.Player1_Red)
             {
-                // Red: Reflector (Fox/Falco style)
                 isReflecting = true;
-                ExecuteAttack("DownSpecialRed", redReflectorSprite, 5f); // Does 5% if it hits them directly
-                
-                // Stall momentum in the air briefly, just like Fox!
+                ExecuteAttack("DownSpecialRed", redReflectorSprite, 5f);
                 rb.linearVelocity = Vector2.zero; 
-                
-                // Turn off the reflection after half a second
                 Invoke("ResetReflect", 0.5f); 
             }
             else
             {
-                // Blue: Start the Spin Charge (Sonic style)
                 isChargingSpin = true;
                 currentSpinCharge = 0;
-                isAttacking = true; // FIX: Change this from currentState = State.Attacking
+                isAttacking = true; 
             }
             return;
         }
@@ -559,7 +543,6 @@ private void DetermineSpecialAttack(int xInput)
             }
             else 
             {
-                // Blue spins! 15% damage and acts as a reflector.
                 isReflecting = true; 
                 isSpinning = true;
                 
@@ -576,21 +559,16 @@ private void DetermineSpecialAttack(int xInput)
 
             if (playerType == PlayerID.Player1_Red)
             {
-                // Dark Pit Electroshock Arm: Reflects, hits hard, lunges forward
                 isReflecting = true;
                 ExecuteAttack("SideSpecialRed", redSideSpecialSprite, 25f);
                 
-                // Heavy forward lunge
                 rb.linearVelocity = new Vector2(moveDir * redLungeSpeed, rb.linearVelocity.y);
                 
-                Invoke("ResetReflect", 0.4f); // Turn off reflect after the punch
+                Invoke("ResetReflect", 0.4f);
             }
             else
             {
-                // Lightspeed Dash: Fast horizontal recovery, weak hit
                 ExecuteAttack("SideSpecialBlue", blueSideSpecialSprite, 5f);
-                
-                // Burst horizontally, zeroing out gravity/falling momentarily
                 rb.linearVelocity = new Vector2(moveDir * blueDashSpeed, 0f);
             }
             return;
@@ -604,7 +582,6 @@ private void DetermineSpecialAttack(int xInput)
             GameObject fireball = Instantiate(fireballPrefab, shootPoint.position, Quaternion.identity);
             FireballScript fbScript = fireball.GetComponent<FireballScript>();
             
-            // Tell the fireball which way to fly based on Red's facing direction
             if (fbScript != null) fbScript.Initialize(isFacingRight, this);
         }
     }
@@ -612,9 +589,8 @@ private void DetermineSpecialAttack(int xInput)
     private void ResetReflect()
     {
         isReflecting = false;
-        isSpinning = false; // Stop rotating
+        isSpinning = false;
         
-        // Snap the character perfectly upright so they don't land on their head!
         transform.rotation = Quaternion.identity; 
     }
 
@@ -627,16 +603,14 @@ private void DetermineSpecialAttack(int xInput)
         HideAllSprites();
         
         if (spriteToShow != null) spriteToShow.SetActive(true);
-        if (secondarySprite != null) secondarySprite.SetActive(true); // Turns on the back glove for D-Smash
+        if (secondarySprite != null) secondarySprite.SetActive(true); 
         
         // --- HITBOX & KNOCKBACK LOGIC ---
-        // Check for colliders within a 1.5 unit radius
         Collider2D[] hitPlayers = Physics2D.OverlapCircleAll(transform.position, 1.5f); 
         foreach (Collider2D hit in hitPlayers)
         {
             PlayerController enemyPlayer = hit.GetComponent<PlayerController>();
             
-            // If we found a player, and it's NOT us...
             if (enemyPlayer != null && enemyPlayer != this)
             {
                 Vector2 knockbackDir = (enemyPlayer.transform.position - transform.position).normalized;
@@ -651,23 +625,20 @@ private void DetermineSpecialAttack(int xInput)
                 {
                     knockbackDir = Vector2.up; 
                 }
-                // --- NEW: RED SIDE SPECIAL (Electroshock Angle) ---
+                // --- RED SIDE SPECIAL (Electroshock Angle) ---
                 else if (attackName == "SideSpecialRed")
                 {
-                    // Strict 45-degree upward/forward launch
                     float hitDir = (enemyPlayer.transform.position.x > transform.position.x) ? 1f : -1f;
                     knockbackDir = new Vector2(hitDir, 1f).normalized; 
                 }
-                // --- NEW: BLUE SIDE SPECIAL (Weak Horizontal Angle) ---
+                // --- BLUE SIDE SPECIAL (Weak Horizontal Angle) ---
                 else if (attackName == "SideSpecialBlue")
                 {
-                    // Mostly horizontal, very slight lift to prevent floor dragging
                     float hitDir = (enemyPlayer.transform.position.x > transform.position.x) ? 1f : -1f;
                     knockbackDir = new Vector2(hitDir, 0.2f).normalized;
                 }
                 else if (attackName == "UpSpecialRed")
                 {
-                    // Launches them primarily up and slightly away
                     float hitDir = (enemyPlayer.transform.position.x > transform.position.x) ? 0.3f : -0.3f;
                     knockbackDir = new Vector2(hitDir, 1f).normalized;
                 }
@@ -694,7 +665,6 @@ private void DetermineSpecialAttack(int xInput)
         if (Time.time <= parryWindowEnd)
         {
             Debug.Log($"** PARRY! ** {playerType} perfectly deflected the attack!");
-            // A parry takes 0 damage, 0 knockback, and ignores the hit completely.
             return; 
         }
 
@@ -746,17 +716,15 @@ private void DetermineSpecialAttack(int xInput)
     private void StartChargeSmash(string attackName, GameObject sprite, float baseDamage, GameObject secondary = null)
     {
         currentState = State.ChargingSmash;
-        velocity = Vector2.zero; // Stop sliding
+        velocity = Vector2.zero; 
         rb.linearVelocity = Vector2.zero;
         chargeTimer = 0f;
         
-        // Store the attack details for when we release the button
         pendingAttackName = attackName;
         pendingDamage = baseDamage;
         pendingSprite = sprite;
         pendingSecondarySprite = secondary;
         
-        // Show the wind-up frame (using the attack sprite for now)
         HideAllSprites();
         if (pendingSprite != null) pendingSprite.SetActive(true);
         if (pendingSecondarySprite != null) pendingSecondarySprite.SetActive(true);
@@ -851,7 +819,8 @@ private void DetermineSpecialAttack(int xInput)
         if (upBoxingGloveSprite != null) upBoxingGloveSprite.SetActive(false);
         if (hammerSprite != null) hammerSprite.SetActive(false);
         if (spikeHelmetSprite != null) spikeHelmetSprite.SetActive(false);
-        if (backBoxingGloveSprite != null) backBoxingGloveSprite.SetActive(false); 
+        if (backBoxingGloveSprite != null) backBoxingGloveSprite.SetActive(false);
+        if (redReflectorSprite != null) redReflectorSprite.SetActive(false);
     }
 
     // --- GROUND COLLISIONS & WAVEDASHING ---
@@ -862,7 +831,7 @@ private void DetermineSpecialAttack(int xInput)
             if (currentState == State.Helpless || currentState == State.Airborne)
             {
                 currentState = State.Grounded;
-                jumpsRemaining = 1; // FIX: Change this from canDoubleJump
+                jumpsRemaining = 1; 
             }
 
             if (currentState == State.Dodging && velocity.y < 0)
