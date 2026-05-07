@@ -45,7 +45,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("Neutral Special Stats")]
     public KeyCode specialKey;
-    public GameObject fireballPrefab; // Drag Red's fireball prefab here
+    public GameObject fireballPrefab;
     public GameObject spinSprite;     // Drag Blue's spin sprite here
     public Transform shootPoint;      // An empty GameObject in front of the player
 
@@ -557,7 +557,7 @@ public class PlayerController : MonoBehaviour
                 isReflecting = true;
                 isSpinning = true;
 
-                ExecuteAttack("SpinAttack", boxingGloveSprite, 15f);
+                ExecuteAttack("SpinAttack", spinSprite, 15f);
 
                 Invoke("ResetReflect", 0.3f);
             }
@@ -869,6 +869,7 @@ public class PlayerController : MonoBehaviour
         if (backBoxingGloveSprite != null) backBoxingGloveSprite.SetActive(false);
         if (redSideSpecialSprite != null) redSideSpecialSprite.SetActive(false);
         if (redReflectorSprite != null) redReflectorSprite.SetActive(false);
+        if (spinSprite != null) spinSprite.SetActive(false);
     }
 
     // --- GROUND COLLISIONS & WAVEDASHING ---
