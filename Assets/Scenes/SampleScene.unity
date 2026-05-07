@@ -3170,7 +3170,7 @@ MonoBehaviour:
   fireballPrefab: {fileID: 6445127030755730479, guid: 36b1aae86be87416cbef5771b9974306, type: 3}
   spinSprite: {fileID: 0}
   shootPoint: {fileID: 926024881}
-  redSideSpecialSprite: {fileID: 0}
+  redSideSpecialSprite: {fileID: 1532157334}
   blueSideSpecialSprite: {fileID: 0}
   blueDashSpeed: 30
   redLungeSpeed: 12
@@ -3178,7 +3178,7 @@ MonoBehaviour:
   blueUpSpecialPower: 25
   redUpSpecialSprite: {fileID: 0}
   redReflectorSprite: {fileID: 2026699372}
-  blueBaseSpinSpeed: 15
+  blueBaseSpinSpeed: 7.5
   maxSpinCharge: 6
   spinRotationSpeed: 1500
   isReflecting: 0
