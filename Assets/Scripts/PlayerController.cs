@@ -509,7 +509,7 @@ public class PlayerController : MonoBehaviour
                 velocity = new Vector2(0f, blueUpSpecialPower);
                 
                 // NEW: Hit the brakes after 0.15 seconds to set the travel distance!
-                Invoke("HaltMomentum", 0.15f); 
+                Invoke("HaltMomentum", 0.05f); 
             }
 
             // Immediately enter Helpless state after the move starts
@@ -577,6 +577,8 @@ public class PlayerController : MonoBehaviour
                 // Heavy forward lunge
                 velocity = new Vector2(moveDir * redLungeSpeed, velocity.y);
 
+                Invoke("HaltMomentum", 0.2f);
+
                 Invoke("ResetReflect", 0.4f); // Turn off reflect after the punch
             }
             else
@@ -588,7 +590,7 @@ public class PlayerController : MonoBehaviour
                 velocity = new Vector2(moveDir * blueDashSpeed, 0f);
                 
                 // NEW: Hit the brakes after 0.15 seconds to set the travel distance!
-                Invoke("HaltMomentum", 0.15f); 
+                Invoke("HaltMomentum", 0.05f); 
             }
             return;
         }
@@ -627,7 +629,6 @@ public class PlayerController : MonoBehaviour
         if (secondarySprite != null) secondarySprite.SetActive(true); // Turns on the back glove for D-Smash
 
         // --- HITBOX & KNOCKBACK LOGIC ---
-        // Check for colliders within a 1.5 unit radius
         Collider2D[] hitPlayers = Physics2D.OverlapCircleAll(transform.position, 1.5f);
         foreach (Collider2D hit in hitPlayers)
         {
@@ -833,7 +834,7 @@ public class PlayerController : MonoBehaviour
             Debug.Log($"{playerType} Neutral Air Dodged!");
         }
 
-        Invoke("EndHitstun", 0.4f);
+        Invoke("EndAirDodge", 0.4f);
     }
 
     // --- UTILITY ---
@@ -847,13 +848,13 @@ public class PlayerController : MonoBehaviour
 
     private void HaltMomentum()
     {
-        // Cuts the horizontal speed down to 10% so they stop sliding
-        velocity.x *= 0.1f; 
+        // Complete horizontal stop
+        velocity.x = 0f; 
         
-        // If they are rocketing upwards, cut that speed down too
+        // If he is still rocketing upwards, kill the upward momentum completely
         if (velocity.y > 0) 
         {
-            velocity.y *= 0.1f;
+            velocity.y = 0f;
         }
     }
 
@@ -866,6 +867,8 @@ public class PlayerController : MonoBehaviour
         if (hammerSprite != null) hammerSprite.SetActive(false);
         if (spikeHelmetSprite != null) spikeHelmetSprite.SetActive(false);
         if (backBoxingGloveSprite != null) backBoxingGloveSprite.SetActive(false);
+        if (redSideSpecialSprite != null) redSideSpecialSprite.SetActive(false);
+        if (redReflectorSprite != null) redReflectorSprite.SetActive(false);
     }
 
     // --- GROUND COLLISIONS & WAVEDASHING ---
@@ -978,5 +981,17 @@ public class PlayerController : MonoBehaviour
 
         if (Mathf.Abs(rb.linearVelocity.y) > 0.1f) currentState = State.Airborne;
         else currentState = State.Grounded;
+    }
+
+    private void EndAirDodge()
+    {
+        HideAllSprites();
+
+        // If we are still dodging (meaning we haven't touched the ground yet)
+        if (currentState == State.Dodging)
+        {
+            // Enter freefall! Gravity works, but they can't attack/jump until they land.
+            currentState = State.Helpless; 
+        }
     }
 }
