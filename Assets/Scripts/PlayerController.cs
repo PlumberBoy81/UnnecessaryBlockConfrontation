@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using System.Collections;
 
 public class PlayerController : MonoBehaviour
 {
@@ -725,6 +726,11 @@ public class PlayerController : MonoBehaviour
 
         velocity = knockbackDir.normalized * knockbackForce * 0.2f;
 
+        StartCoroutine(ApplyHitlag(incomingDamage));
+
+        CancelInvoke("EndHitstun");
+
+        float hitstunDuration = 0.3f + (knockbackForce * 0.015f);
         Invoke("EndHitstun", 0.5f);
     }
 
@@ -952,6 +958,8 @@ public class PlayerController : MonoBehaviour
 
     private void ExecuteKO()
     {
+        Time.timeScale = 1.0f;
+        
         Debug.Log($"GAME! {playerType} was blasted off the screen!");
 
         // Reset stats and safety flags
@@ -994,5 +1002,20 @@ public class PlayerController : MonoBehaviour
             // Enter freefall! Gravity works, but they can't attack/jump until they land.
             currentState = State.Helpless; 
         }
+    }
+
+    private IEnumerator ApplyHitlag(float damage)
+    {
+        // Base freeze of 0.05s, plus a little extra depending on the damage
+        float hitlagDuration = 0.02f + (damage * 0.005f);
+
+        // Slam on the brakes: freeze time completely!
+        Time.timeScale = 0.0f;
+
+        // Wait for the calculated time (using Realtime since game time is paused)
+        yield return new WaitForSecondsRealtime(hitlagDuration);
+
+        // Resume the action!
+        Time.timeScale = 1.0f;
     }
 }
