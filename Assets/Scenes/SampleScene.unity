@@ -990,8 +990,8 @@ MonoBehaviour:
   blueUpSpecialPower: 25
   redUpSpecialSprite: {fileID: 0}
   redReflectorSprite: {fileID: 0}
-  blueBaseSpinSpeed: 15
-  maxSpinCharge: 6
+  blueBaseSpinSpeed: 1
+  maxSpinCharge: 2
   spinRotationSpeed: 1500
   isReflecting: 0
   maxShieldHealth: 50
@@ -3173,7 +3173,7 @@ MonoBehaviour:
   redSideSpecialSprite: {fileID: 1532157334}
   blueSideSpecialSprite: {fileID: 0}
   blueDashSpeed: 30
-  redLungeSpeed: 12
+  redLungeSpeed: 6
   redUpSpecialPower: 3.5
   blueUpSpecialPower: 25
   redUpSpecialSprite: {fileID: 0}
