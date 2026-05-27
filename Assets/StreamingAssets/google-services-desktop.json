@@ -1,0 +1,31 @@
+{
+  "project_info": {
+    "project_number": "731637543497",
+    "project_id": "uneccessaryblockconfrontation",
+    "storage_bucket": "uneccessaryblockconfrontation.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:731637543497:ios:09c5cc778b10d172508598",
+        "android_client_info": {
+          "package_name": "com.PlumberBoy81Studios.UnnecessaryBlockConfrontation"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "AIzaSyCN3qRFIOxf7aQrQBuZFepw0idr5P4y4rk"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 0
+        },
+        "appinvite_service": {
+          "status": 1
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

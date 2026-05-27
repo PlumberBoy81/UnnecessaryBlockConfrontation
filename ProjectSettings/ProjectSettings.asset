@@ -165,6 +165,7 @@ PlayerSettings:
   androidMinAspectRatio: 1
   applicationIdentifier:
     Standalone: com.DefaultCompany.2D-URP
+    iPhone: com.PlumberBoy81Studios.UnnecessaryBlockConfrontation
   buildNumber:
     Standalone: 0
     VisionOS: 0
