@@ -160,18 +160,30 @@ public class PlayerController : MonoBehaviour
 
     private void AssignInputsAndStats()
     {
+        bool isMac = Application.platform == RuntimePlatform.OSXEditor || 
+                Application.platform == RuntimePlatform.OSXPlayer;
         if (playerType == PlayerID.Player1_Red)
-        {
-            // Keyboard Inputs
+        {            
             upKey = KeyCode.W; downKey = KeyCode.S; leftKey = KeyCode.A; rightKey = KeyCode.D;
             walkModKey = KeyCode.LeftShift; attackKey = KeyCode.F; shieldKey = KeyCode.E; specialKey = KeyCode.R;
 
-            // Gamepad Inputs (F310 in X mode: A=0, B=1, X=2, Y=3, LB=4, RB=5)
+            // Gamepad Inputs
             hAxis = "P1_Horizontal"; vAxis = "P1_Vertical";
-            gpAttack = KeyCode.Joystick1Button0;   // A Button
-            gpSpecial = KeyCode.Joystick1Button1;  // B Button
-            gpJump = KeyCode.Joystick1Button3;     // Y Button (and X Button)
-            gpShield = KeyCode.Joystick1Button5;   // Right Bumper
+            
+            if (isMac)
+            {
+                gpAttack = KeyCode.Joystick1Button1;   // Typical 'A' button index on Mac HID
+                gpSpecial = KeyCode.Joystick1Button2;  // Typical 'B' button index
+                gpJump = KeyCode.Joystick1Button3;     // Typical 'X' or 'Y' button
+                gpShield = KeyCode.Joystick1Button5;   // Right Bumper
+            }
+            else
+            {
+                gpAttack = KeyCode.Joystick1Button0;   // A Button
+                gpSpecial = KeyCode.Joystick1Button1;  // B Button
+                gpJump = KeyCode.Joystick1Button3;     // Y Button
+                gpShield = KeyCode.Joystick1Button5;   // Right Bumper
+            }
 
             stats = new CharacterStats
             {
@@ -187,12 +199,20 @@ public class PlayerController : MonoBehaviour
             upKey = KeyCode.UpArrow; downKey = KeyCode.DownArrow; leftKey = KeyCode.LeftArrow; rightKey = KeyCode.RightArrow;
             walkModKey = KeyCode.RightShift; attackKey = KeyCode.RightControl; shieldKey = KeyCode.Keypad0; specialKey = KeyCode.RightAlt;
 
-            // Gamepad Inputs
-            hAxis = "P2_Horizontal"; vAxis = "P2_Vertical";
-            gpAttack = KeyCode.Joystick2Button0;   
-            gpSpecial = KeyCode.Joystick2Button1;  
-            gpJump = KeyCode.Joystick2Button3;     
-            gpShield = KeyCode.Joystick2Button5;   
+            if (isMac)
+            {
+                gpAttack = KeyCode.Joystick2Button1;   // Typical 'A' button index on Mac HID
+                gpSpecial = KeyCode.Joystick2Button2;  // Typical 'B' button index
+                gpJump = KeyCode.Joystick2Button3;     // Typical 'X' or 'Y' button
+                gpShield = KeyCode.Joystick2Button5;   // Right Bumper
+            }
+            else
+            {
+                gpAttack = KeyCode.Joystick2Button0;   // A Button
+                gpSpecial = KeyCode.Joystick2Button1;  // B Button
+                gpJump = KeyCode.Joystick2Button3;     // Y Button
+                gpShield = KeyCode.Joystick2Button5;   // Right Bumper
+            } 
 
             stats = new CharacterStats
             {
