@@ -164,7 +164,7 @@ public class PlayerController : MonoBehaviour
         {
             // Keyboard Inputs
             upKey = KeyCode.W; downKey = KeyCode.S; leftKey = KeyCode.A; rightKey = KeyCode.D;
-            walkModKey = KeyCode.LeftShift; attackKey = KeyCode.F; shieldKey = KeyCode.E; specialKey = KeyCode.G;
+            walkModKey = KeyCode.LeftShift; attackKey = KeyCode.F; shieldKey = KeyCode.E; specialKey = KeyCode.R;
 
             // Gamepad Inputs (F310 in X mode: A=0, B=1, X=2, Y=3, LB=4, RB=5)
             hAxis = "P1_Horizontal"; vAxis = "P1_Vertical";
