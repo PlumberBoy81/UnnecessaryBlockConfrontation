@@ -154,7 +154,6 @@ public class PlayerController : MonoBehaviour
     private KeyCode shieldKey;
     private KeyCode specialKey;
 
-    // Analog stick edge detection.
     private bool wasUp;
     private bool wasDown;
     private bool wasLeft;
@@ -165,25 +164,21 @@ public class PlayerController : MonoBehaviour
     private bool isLeft;
     private bool isRight;
 
-    // Physics.
     private Rigidbody2D rb;
     private Vector2 velocity;
 
     private bool isFastFalling = false;
     private int jumpsRemaining = 1;
 
-    // Jab.
     private int currentJabCombo = 0;
     private float lastJabTime = -10f;
 
-    // Smash charge.
     private float chargeTimer = 0f;
     private string pendingAttackName;
     private float pendingDamage;
     private GameObject pendingSprite;
     private GameObject pendingSecondarySprite;
 
-    // Used to avoid stale invoke callbacks.
     private Coroutine hitlagCoroutine;
 
     private void Start()
@@ -242,15 +237,9 @@ public class PlayerController : MonoBehaviour
             ApplyPhysics();
         }
 
-        // Your character stats are measured in "per-frame" style units,
-        // so convert them into Unity's units-per-second here.
         rb.linearVelocity =
             velocity * (1f / Time.fixedDeltaTime) * unitScale;
     }
-
-    // ============================================================
-    // INPUT / CHARACTER SETUP
-    // ============================================================
 
     private void AssignInputsAndStats()
     {
@@ -387,7 +376,6 @@ public class PlayerController : MonoBehaviour
         return (isUp && !wasUp) || Input.GetKeyDown(gpJump);
     }
 
-    // Directional input ONLY. Jump button is intentionally excluded.
     private bool GetUpDirectionDown()
     {
         if (!useGamepad)
@@ -495,18 +483,10 @@ public class PlayerController : MonoBehaviour
             : Input.GetKey(shieldKey);
     }
 
-    // ============================================================
-    // MAIN INPUT HANDLING
-    // ============================================================
-
     private void HandleInputs()
     {
         if (currentState == State.Helpless)
             return;
-
-        // --------------------------------------------------------
-        // BLUE DOWN SPECIAL CHARGE
-        // --------------------------------------------------------
 
         if (isChargingSpin)
         {
@@ -561,10 +541,6 @@ public class PlayerController : MonoBehaviour
         if (currentState == State.Hitstun)
             return;
 
-        // --------------------------------------------------------
-        // SMASH CHARGING
-        // --------------------------------------------------------
-
         if (currentState == State.ChargingSmash)
         {
             chargeTimer += Time.deltaTime;
@@ -598,10 +574,6 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        // --------------------------------------------------------
-        // SMASH INPUT BUFFER
-        // --------------------------------------------------------
-
         if (GetDownDown())
             lastDownPress = Time.time;
 
@@ -613,10 +585,6 @@ public class PlayerController : MonoBehaviour
 
         if (currentState == State.Dodging)
             return;
-
-        // --------------------------------------------------------
-        // WALKING
-        // --------------------------------------------------------
 
         float analogMagnitude =
             useGamepad
@@ -630,10 +598,6 @@ public class PlayerController : MonoBehaviour
                 analogMagnitude > 0.1f &&
                 analogMagnitude < 0.6f
             );
-
-        // --------------------------------------------------------
-        // SHIELD / DEFENSE
-        // --------------------------------------------------------
 
         if (GetShield())
         {
@@ -690,7 +654,6 @@ public class PlayerController : MonoBehaviour
                 if (shieldBubble != null)
                     shieldBubble.SetActive(false);
 
-                // 5 frames at 60 FPS.
                 parryWindowEnd =
                     Time.time + (5f / 60f);
             }
@@ -711,10 +674,6 @@ public class PlayerController : MonoBehaviour
                 shieldBubble.SetActive(false);
         }
 
-        // --------------------------------------------------------
-        // ATTACK
-        // --------------------------------------------------------
-
         if (GetAttackDown())
         {
             if (currentState == State.Grounded)
@@ -732,10 +691,6 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        // --------------------------------------------------------
-        // SPECIAL
-        // --------------------------------------------------------
-
         if (GetSpecialDown())
         {
             if (currentState == State.Grounded ||
@@ -746,10 +701,6 @@ public class PlayerController : MonoBehaviour
 
             return;
         }
-
-        // --------------------------------------------------------
-        // JUMP
-        // --------------------------------------------------------
 
         if (GetUpDown())
         {
@@ -768,10 +719,6 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // --------------------------------------------------------
-        // FAST FALL
-        // --------------------------------------------------------
-
         if (currentState == State.Airborne &&
             GetDownDown() &&
             velocity.y < 0f)
@@ -779,10 +726,6 @@ public class PlayerController : MonoBehaviour
             isFastFalling = true;
         }
     }
-
-    // ============================================================
-    // PHYSICS
-    // ============================================================
 
     private void ApplyPhysics()
     {
@@ -845,7 +788,6 @@ public class PlayerController : MonoBehaviour
             if (velocity.y < -maximumFallSpeed)
                 velocity.y = -maximumFallSpeed;
 
-            // Hitstun preserves knockback horizontal momentum.
             if (currentState != State.Hitstun)
             {
                 if (xInput != 0)
@@ -905,10 +847,6 @@ public class PlayerController : MonoBehaviour
         if (isDoubleJump)
             jumpsRemaining--;
     }
-
-    // ============================================================
-    // GROUND ATTACKS
-    // ============================================================
 
     private void DetermineGroundAttack(
         int xInput,
@@ -990,10 +928,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // ============================================================
-    // AERIAL ATTACKS
-    // ============================================================
-
     private void DetermineAerialAttack(int xInput)
     {
         if (GetDown())
@@ -1045,16 +979,8 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // ============================================================
-    // SPECIAL ATTACKS
-    // ============================================================
-
     private void DetermineSpecialAttack(int xInput)
     {
-        // --------------------------------------------------------
-        // UP SPECIAL
-        // --------------------------------------------------------
-
         if (GetUpDirection())
         {
             if (playerType == PlayerID.Player1_Red)
@@ -1093,10 +1019,6 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        // --------------------------------------------------------
-        // DOWN SPECIAL
-        // --------------------------------------------------------
-
         if (GetDown())
         {
             if (playerType == PlayerID.Player1_Red)
@@ -1125,10 +1047,6 @@ public class PlayerController : MonoBehaviour
 
             return;
         }
-
-        // --------------------------------------------------------
-        // NEUTRAL SPECIAL
-        // --------------------------------------------------------
 
         if (xInput == 0 &&
             !GetUpDirection() &&
@@ -1163,10 +1081,6 @@ public class PlayerController : MonoBehaviour
 
             return;
         }
-
-        // --------------------------------------------------------
-        // SIDE SPECIAL
-        // --------------------------------------------------------
 
         if (xInput != 0)
         {
@@ -1251,10 +1165,6 @@ public class PlayerController : MonoBehaviour
             );
         }
     }
-
-    // ============================================================
-    // ATTACK EXECUTION
-    // ============================================================
 
     private void ExecuteAttack(
         string attackName,
@@ -1368,10 +1278,6 @@ public class PlayerController : MonoBehaviour
         Invoke(nameof(EndAttack), 0.3f);
     }
 
-    // ============================================================
-    // DAMAGE / HITSTUN
-    // ============================================================
-
     public void TakeHit(
         float incomingDamage,
         Vector2 knockbackDirection,
@@ -1383,7 +1289,6 @@ public class PlayerController : MonoBehaviour
         if (Time.time <= parryWindowEnd)
             return;
 
-        // Shield damage.
         if (currentState == State.Shielding)
         {
             currentShieldHealth -= incomingDamage;
@@ -1468,10 +1373,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // ============================================================
-    // JAB
-    // ============================================================
-
     private void ExecuteJab()
     {
         if (Time.time - lastJabTime > 0.5f)
@@ -1494,10 +1395,6 @@ public class PlayerController : MonoBehaviour
         if (currentJabCombo >= 3)
             currentJabCombo = 0;
     }
-
-    // ============================================================
-    // SMASH CHARGING
-    // ============================================================
 
     private void StartChargeSmash(
         string attackName,
@@ -1589,10 +1486,6 @@ public class PlayerController : MonoBehaviour
         pendingDamage = 0f;
         chargeTimer = 0f;
     }
-
-    // ============================================================
-    // DODGES
-    // ============================================================
 
     private void ExecuteSpotDodge()
     {
@@ -1686,10 +1579,6 @@ public class PlayerController : MonoBehaviour
             currentState = State.Grounded;
     }
 
-    // ============================================================
-    // HITSTUN
-    // ============================================================
-
     private void EndHitstun()
     {
         HideAllSprites();
@@ -1699,10 +1588,6 @@ public class PlayerController : MonoBehaviour
         else
             currentState = State.Grounded;
     }
-
-    // ============================================================
-    // SPECIAL HELPERS
-    // ============================================================
 
     private void HaltMomentum()
     {
@@ -1721,10 +1606,6 @@ public class PlayerController : MonoBehaviour
             Quaternion.identity;
     }
 
-    // ============================================================
-    // HITLAG
-    // ============================================================
-
     private IEnumerator ApplyHitlag(float damage)
     {
         float hitlagDuration =
@@ -1740,8 +1621,6 @@ public class PlayerController : MonoBehaviour
             hitlagDuration
         );
 
-        // Only restore the game if something else
-        // hasn't deliberately changed the time scale.
         if (Time.timeScale == 0f)
             Time.timeScale = previousTimeScale <= 0f
                 ? 1f
@@ -1749,10 +1628,6 @@ public class PlayerController : MonoBehaviour
 
         hitlagCoroutine = null;
     }
-
-    // ============================================================
-    // COLLISIONS
-    // ============================================================
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
@@ -1775,9 +1650,6 @@ public class PlayerController : MonoBehaviour
 
             currentState = State.Grounded;
         }
-
-        // Hitstun is intentionally not immediately
-        // canceled by touching the ground.
         if (currentState != State.Hitstun)
         {
             currentState = State.Grounded;
@@ -1800,10 +1672,6 @@ public class PlayerController : MonoBehaviour
             currentState = State.Airborne;
         }
     }
-
-    // ============================================================
-    // BLAST ZONE / KO
-    // ============================================================
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
@@ -1863,10 +1731,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // ============================================================
-    // SHIELD
-    // ============================================================
-
     private void UpdateShieldVisual()
     {
         if (shieldBubble == null ||
@@ -1893,7 +1757,6 @@ public class PlayerController : MonoBehaviour
         if (shieldBubble != null)
             shieldBubble.SetActive(false);
 
-        // Shield break launches the player upward.
         velocity = new Vector2(
             0f,
             stats.jumpHeight
@@ -1904,10 +1767,6 @@ public class PlayerController : MonoBehaviour
 
         UpdateShieldVisual();
     }
-
-    // ============================================================
-    // SPRITE MANAGEMENT
-    // ============================================================
 
     private void HideAllSprites()
     {
@@ -1953,10 +1812,6 @@ public class PlayerController : MonoBehaviour
         HideAllSprites();
         isAttacking = false;
     }
-
-    // ============================================================
-    // DEBUG
-    // ============================================================
 
     private void OnDrawGizmosSelected()
     {
